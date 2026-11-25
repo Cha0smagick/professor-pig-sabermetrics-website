@@ -22,11 +22,12 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/configure-pages@v5
-        with:
-          enablement: true
+
+      # El artefacto se sube SIEMPRE, aunque Pages aun no este activado.
+      # Asi, tras activar Pages, basta con re-ejecutar el job de deploy.
       - uses: actions/upload-pages-artifact@v3
         with:
           path: site
+
       - id: deployment
         uses: actions/deploy-pages@v4
