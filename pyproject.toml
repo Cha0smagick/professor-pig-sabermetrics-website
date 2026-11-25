@@ -1,0 +1,20 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "sabermetria"
+version = "1.0.0"
+description = "Motor predictivo de futbol basado en Dixon-Coles con validacion walk-forward"
+requires-python = ">=3.10"
+dependencies = ["numpy>=2.0,<3", "scipy>=1.11,<2", "pandas>=2.0,<3"]
+
+[project.optional-dependencies]
+dev = ["pytest>=8.0"]
+
+[tool.setuptools]
+packages = ["sabermetria"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q"

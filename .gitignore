@@ -1,0 +1,64 @@
+# Secretos y configuracion local
+.env
+config/
+*.pem
+*.key
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+*.egg-info/
+
+# Artefactos de build (se regeneran)
+artifacts/
+logs/
+*.log
+artifacts_build.log
+
+# Datos crudos duplicados / caches
+data/external/
+data/cache/
+data/rag_index/
+data/raw/
+data/processed/
+data/*.db
+data/*.txt
+datos/
+openfootball_data/
+footballdata_cache/
+historical_data_cache/
+worldfootball_cache/
+predicciones/
+predicciones_mundial2026/
+
+# Codigo y material archivado
+legacy/
+backup/
+undefined/
+sistema_multiagente/
+tools/
+src/
+evolution/
+futbolmetria_analitica_sas/
+external_tools/
+notebooks/
+entornos/
+"Machine Learning"/
+
+# Modelos binarios no reproducibles
+models/
+*.pkl
+*.joblib
+
+# Repos anidados
+openfootball_data/football.json/.git/
+
+# Editor / agentes
+.omo/
+.opencode/
+.codegraph/

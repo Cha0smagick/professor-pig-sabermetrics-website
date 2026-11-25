@@ -1,0 +1,293 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Sabermetría · Laboratorio predictivo</title>
+<meta name="description" content="Laboratorio estadístico de fútbol: resultados históricos, forma, Elo, medio tiempo, árbitros y probabilidades con un modelo Dixon-Coles validado walk-forward.">
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+<a class="skip" href="#main">Saltar al contenido</a>
+<header class="top">
+  <div class="brand">
+    <svg viewBox="0 0 32 32" aria-hidden="true" class="mark"><path d="M4 26 L12 6 L20 26 M8 19 H16" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"/><circle cx="24" cy="9" r="3" fill="currentColor"/></svg>
+    <div>
+      <h1>SABERMETRÍA</h1>
+      <p>Laboratorio estadístico · Dixon-Coles validado</p>
+    </div>
+  </div>
+  <div class="stamp" id="dataStamp" aria-live="polite">cargando datos…</div>
+</header>
+
+<nav class="tabs" role="tablist" aria-label="Secciones">
+  <button role="tab" id="tab-predict" aria-controls="panel-predict" aria-selected="true">Predecir</button>
+  <button role="tab" id="tab-lab" aria-controls="panel-lab" aria-selected="false">Laboratorio</button>
+  <button role="tab" id="tab-data" aria-controls="panel-data" aria-selected="false">Datos</button>
+  <button role="tab" id="tab-model" aria-controls="panel-model" aria-selected="false">Modelo</button>
+</nav>
+
+<main id="main">
+  <!-- PREDECIR -->
+  <section id="panel-predict" role="tabpanel" aria-labelledby="tab-predict">
+    <div class="card controls">
+      <div class="field">
+        <label for="league">Competición</label>
+        <select id="league"></select>
+      </div>
+      <div class="field">
+        <label for="home">Equipo local</label>
+        <select id="home"></select>
+      </div>
+      <button id="swap" class="ghost" type="button" title="Intercambiar equipos" aria-label="Intercambiar equipos">⇄</button>
+      <div class="field">
+        <label for="away">Equipo visitante</label>
+        <select id="away"></select>
+      </div>
+      <label class="check"><input type="checkbox" id="neutral"> Sede neutral</label>
+    </div>
+    <p class="note controls-note">Simula cualquier cruce entre equipos de la competición. No es un calendario oficial ni una recomendación de apuesta.</p>
+
+    <div id="predictEmpty" class="card muted">Elige una competición y dos equipos.</div>
+
+    <div id="predictResult" hidden>
+      <div class="grid two">
+        <div class="card">
+          <div class="card-head">
+            <h2 id="matchTitle">—</h2>
+            <span class="tag" id="leagueTag"></span>
+          </div>
+          <div class="outcome-row" id="outcomes"></div>
+          <div class="xg-row">
+            <div><span class="k">Goles esperados</span><strong id="xg">—</strong></div>
+            <div><span class="k">Margen del favorito</span><strong id="confidence">—</strong></div>
+            <div><span class="k">Ventaja local</span><strong id="homeAdv">—</strong></div>
+          </div>
+          <div class="fair-row" id="fairOdds"></div>
+          <p class="note" id="confidenceNote"></p>
+        </div>
+
+        <div class="card">
+          <h2>Marcadores más probables</h2>
+          <ul class="scores" id="scores"></ul>
+          <h3>Doble oportunidad</h3>
+          <div class="chips" id="doubleChance"></div>
+          <h3>Ambos marcan</h3>
+          <div class="chips" id="btts"></div>
+        </div>
+      </div>
+
+      <div class="grid two">
+        <div class="card">
+          <h2>Más / menos goles</h2>
+          <table class="mini"><thead><tr><th>Línea</th><th>Más</th><th>Menos</th><th>Cuota justa (más)</th></tr></thead><tbody id="ouBody"></tbody></table>
+        </div>
+        <div class="card">
+          <h2>Hándicap asiático (local)</h2>
+          <table class="mini"><thead><tr><th>Línea</th><th>Gana</th><th>Nula</th><th>Pierde</th><th>Cuota justa</th></tr></thead><tbody id="ahBody"></tbody></table>
+          <p class="note">Hándicap aplicado al local. «Nula» devuelve la apuesta.</p>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-head">
+          <h2>Valor contra cuotas</h2>
+          <button id="clearOdds" class="ghost small" type="button">Limpiar</button>
+        </div>
+        <p class="note">Introduce las cuotas decimales de tu casa. Se muestra el valor esperado (EV) y la fracción de Kelly al 25% con tope del 5% de banca. No es consejo de apuestas.</p>
+        <div class="odds-grid">
+          <div class="field"><label for="oddsHome">Gana local</label><input id="oddsHome" type="number" min="1.01" step="0.01" inputmode="decimal" placeholder="2.10"></div>
+          <div class="field"><label for="oddsDraw">Empate</label><input id="oddsDraw" type="number" min="1.01" step="0.01" inputmode="decimal" placeholder="3.40"></div>
+          <div class="field"><label for="oddsAway">Gana visitante</label><input id="oddsAway" type="number" min="1.01" step="0.01" inputmode="decimal" placeholder="3.60"></div>
+        </div>
+        <table class="mini"><thead><tr><th>Resultado</th><th>Prob.</th><th>Cuota justa</th><th>Tu cuota</th><th>EV</th><th>Kelly</th></tr></thead><tbody id="valueBody"></tbody></table>
+      </div>
+
+      <div class="card" id="contextCard">
+        <div class="card-head"><h2>Contexto real</h2><span class="tag" id="contextTag">—</span></div>
+        <div class="grid two" id="contextBody"></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- LABORATORIO -->
+  <section id="panel-lab" role="tabpanel" aria-labelledby="tab-lab" hidden>
+    <div class="card controls">
+      <div class="field">
+        <label for="labLeague">Competición</label>
+        <select id="labLeague"></select>
+      </div>
+      <div class="field grow">
+        <label for="labSearch">Buscar equipo</label>
+        <input id="labSearch" type="search" placeholder="Nombre del equipo…">
+      </div>
+      <div class="field">
+        <label for="labScope">Vista</label>
+        <select id="labScope">
+          <option value="all">Histórico completo</option>
+          <option value="recent">Última temporada</option>
+        </select>
+      </div>
+      <span class="tag" id="labTag">—</span>
+    </div>
+
+    <div class="grid four" id="labKpis"></div>
+    <p class="note" id="labScopeNote"></p>
+
+    <div class="grid two">
+      <div class="card">
+        <h2>Resultados por temporada</h2>
+        <div id="seasonChart" class="chart"></div>
+        <p class="note">Reparto local / empate / visitante en cada temporada. La altura total es siempre 100%.</p>
+      </div>
+      <div class="card">
+        <h2>Goles por partido</h2>
+        <div id="goalsChart" class="chart"></div>
+        <p class="note">Frecuencia de partidos según el total de goles.</p>
+      </div>
+    </div>
+
+    <div class="grid two">
+      <div class="card">
+        <h2>Marcadores más frecuentes</h2>
+        <div class="chips" id="scorelines"></div>
+        <h2 class="spaced">Tiempos y remontadas</h2>
+        <div class="meta-list" id="timeStats"></div>
+      </div>
+      <div class="card">
+        <h2>Temporadas en detalle</h2>
+        <div class="table-scroll">
+          <table class="data"><thead><tr><th>Temporada</th><th>PJ</th><th>Goles/P</th><th>Local</th><th>Empate</th><th>Visitante</th><th>+2.5</th><th>BTTS</th><th>1T</th><th>2T</th></tr></thead><tbody id="seasonBody"></tbody></table>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-head">
+        <h2>Equipos</h2>
+        <span class="note" id="labTeamCount"></span>
+      </div>
+      <p class="note">Ordena pulsando las cabeceras. Clic en un equipo para abrir su perfil y el historial contra un rival.</p>
+      <div class="table-scroll">
+        <table class="data sortable" id="labTeamsTable">
+          <thead><tr>
+            <th data-sort="rank">#</th>
+            <th data-sort="name">Equipo</th>
+            <th data-sort="m">PJ</th>
+            <th data-sort="w">G</th>
+            <th data-sort="d">E</th>
+            <th data-sort="l">P</th>
+            <th data-sort="gf">GF</th>
+            <th data-sort="ga">GC</th>
+            <th data-sort="gd">DG</th>
+            <th data-sort="pts">Pts</th>
+            <th data-sort="ppg">PPG</th>
+            <th data-sort="over25_rate">+2.5</th>
+            <th data-sort="btts_rate">BTTS</th>
+            <th data-sort="elo">Elo</th>
+            <th data-sort="luck">Suerte</th>
+            <th data-sort="form">Forma</th>
+          </tr></thead>
+          <tbody id="labTeams"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="card" id="teamDetail" hidden></div>
+    <div class="card" id="refCard" hidden>
+      <h2>Árbitros</h2>
+      <p class="note">Solo competiciones con árbitro en la fuente (Colombia 2022-2024). Mínimo 8 partidos. Es descriptivo: no implica causalidad.</p>
+      <div class="table-scroll">
+        <table class="data"><thead><tr><th>Árbitro</th><th>PJ</th><th>Goles/P</th><th>Local</th><th>Empate</th><th>+2.5</th></tr></thead><tbody id="refBody"></tbody></table>
+      </div>
+    </div>
+  </section>
+
+  <!-- DATOS -->
+  <section id="panel-data" role="tabpanel" aria-labelledby="tab-data" hidden>
+    <div class="grid three" id="sportsGrid"></div>
+    <div class="grid four" id="dataKpis"></div>
+
+    <div class="card">
+      <div class="card-head"><h2>Cobertura por competición</h2><span class="note">Partidos con marcador final</span></div>
+      <div class="table-scroll">
+        <table class="data"><thead><tr><th>Competición</th><th>Estado</th><th>Temp.</th><th>Partidos</th><th>Equipos</th><th>Desde</th><th>Hasta</th><th>Medio tiempo</th><th>Modelo</th></tr></thead><tbody id="coverageBody"></tbody></table>
+      </div>
+    </div>
+
+    <div class="grid two">
+      <div class="card">
+        <h2>Fuentes y calidad</h2>
+        <div id="quality"></div>
+      </div>
+      <div class="card">
+        <h2>Qué no existe (y no se inventa)</h2>
+        <ul class="limits-list">
+          <li><strong>xG</strong>: el campo llega nulo en la muestra de API-Football. No se estima xG donde no hay tiros.</li>
+          <li><strong>Jugadores</strong>: sin minutos, alineaciones completas ni estadística individual.</li>
+          <li><strong>Minutos de gol</strong>: openfootball no los incluye; no hay análisis de tramos.</li>
+          <li><strong>Lesiones, sanciones, viajes, árbitro</strong>: solo Colombia tiene árbitro y sede.</li>
+          <li><strong>Cuotas</strong>: no hay histórico de mercado; el valor se calcula contra la cuota que introduzcas.</li>
+          <li><strong>Otros deportes</strong>: no hay un solo partido de baloncesto, béisbol, NFL, NHL o tenis.</li>
+        </ul>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-head"><h2>Muestra avanzada disponible</h2><span class="tag" id="advancedTag">—</span></div>
+      <div id="advancedSummary"></div>
+      <div class="table-scroll">
+        <table class="data"><thead><tr><th>Fecha</th><th>Local</th><th>Visitante</th><th>Marcador</th><th>Tiros L</th><th>Tiros V</th><th>A puerta L</th><th>A puerta V</th><th>Posesión L</th><th>Pases L</th></tr></thead><tbody id="advancedBody"></tbody></table>
+      </div>
+      <p class="note">n=24. Suficiente para enseñar qué se podría hacer con datos de tiros; insuficiente para inferir. La correlación mostrada es descriptiva.</p>
+    </div>
+  </section>
+
+  <!-- MODELO -->
+  <section id="panel-model" role="tabpanel" aria-labelledby="tab-model" hidden>
+    <div class="grid four" id="metricCards"></div>
+    <div class="grid two">
+      <div class="card">
+        <h2>Calibración agregada</h2>
+        <div id="relChartModel" class="chart"></div>
+        <p class="note">Probabilidad predicha frente a frecuencia observada en los partidos de validación. La diagonal es el ideal.</p>
+      </div>
+      <div class="card">
+        <h2>Cómo funciona</h2>
+        <ol class="method">
+          <li><strong>Datos</strong>: <span id="mMatches">—</span> partidos y <span id="mLeagues">—</span> competiciones. openfootball 2010-2026 + API-Football Colombia 2022-2024.</li>
+          <li><strong>Modelo</strong>: ataque y debilidad defensiva por equipo; nivel medio y ventaja local por liga; goles Poisson con corrección Dixon-Coles en marcadores bajos.</li>
+          <li><strong>Tiempo</strong>: los partidos antiguos pesan menos (semivida elegida por liga).</li>
+          <li><strong>Calibración</strong>: contracción al baseline de la liga, elegida en validación.</li>
+          <li><strong>Validación</strong>: walk-forward estricto. Cada temporada se predice entrenando solo con el pasado.</li>
+          <li><strong>Web</strong>: los parámetros se exportan a JSON y el navegador calcula la matriz. Sin servidor ni peticiones externas.</li>
+        </ol>
+      </div>
+    </div>
+    <div class="card">
+      <div class="card-head"><h2>Resultados por competición</h2><span class="note">Solo se publican predicciones de ligas validadas</span></div>
+      <div class="table-scroll">
+        <table class="data"><thead><tr><th>Competición</th><th>Estado</th><th>n</th><th>Brier</th><th>Baseline</th><th>Δ Brier</th><th>LogLoss</th><th>Acierto</th><th>Cobertura</th></tr></thead><tbody id="metricsBody"></tbody></table>
+      </div>
+      <p class="note">Δ Brier positivo: el modelo bate al baseline de frecuencias. Cobertura: partidos evaluables; los equipos sin historial se omiten.</p>
+    </div>
+    <div class="card limits">
+      <h2>Límites conocidos</h2>
+      <ul>
+        <li>Sin alineaciones, lesiones, xG, árbitro ni cuotas en el modelo. Solo goles y contexto histórico.</li>
+        <li>Los recién ascendidos arrancan con rating medio; su incertidumbre real es mayor.</li>
+        <li>Copas y eliminatorias están excluidas: la ventaja local y los dos partidos rompen el supuesto.</li>
+        <li>Una probabilidad no es una certeza: un 60% falla 4 de cada 10 veces.</li>
+        <li>Nada de esto es consejo financiero ni garantía de rentabilidad.</li>
+      </ul>
+    </div>
+  </section>
+</main>
+
+<footer>
+  <p>Datos: <a href="https://github.com/openfootball/football.json" rel="noopener">openfootball</a> (CC BY-SA) y cache local de API-Football. Modelo: Dixon-Coles con decaimiento temporal. Cálculo íntegro en tu navegador.</p>
+</footer>
+
+<script src="app.js"></script>
+</body>
+</html>
