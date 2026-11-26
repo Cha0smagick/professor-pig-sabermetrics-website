@@ -46,10 +46,8 @@ header.top {
 
 .brand { display: flex; align-items: center; gap: 12px; }
 .logo {
-  width: 60px; height: 76px; flex: none; object-fit: contain;
-  padding: 3px; border-radius: 15px;
-  background: #f4ead6; border: 1px solid #d9c7a4;
-  box-shadow: 0 0 0 3px #ffffff08;
+  width: 64px; height: 80px; flex: none; object-fit: contain;
+  filter: drop-shadow(0 0 1px #fff8e7) drop-shadow(0 2px 8px #000);
 }
 .brand h1 {
   margin: 0; font-size: 21px; letter-spacing: 0.03em; font-weight: 700; line-height: 1.12;
