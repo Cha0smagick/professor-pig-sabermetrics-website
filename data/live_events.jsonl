@@ -64,3 +64,32 @@
 {"sport":"hockey hielo","league":"Swedish Hockey League","date":"2026-11-24","home":"Luleå HF","away":"Malmö Redhawks","hg":2,"ag":3,"source":"thesportsdb"}
 {"sport":"hockey hielo","league":"Swedish Hockey League","date":"2026-11-24","home":"Örebro HK","away":"Frölunda HC","hg":4,"ag":1,"source":"thesportsdb"}
 {"sport":"hockey hielo","league":"Czech Extraliga","date":"2026-11-24","home":"Mladá Boleslav","away":"Rytíři Kladno","hg":2,"ag":3,"source":"thesportsdb"}
+{"sport":"baloncesto","league":"EuroCup Women","date":"2026-11-25","home":"Maccabi Bnot Ashdod","away":"ESB Villeneuve-dAscq Women","hg":66,"ag":74,"source":"thesportsdb"}
+{"sport":"baloncesto","league":"EuroCup Women","date":"2026-11-25","home":"CB Jairis Women","away":"Panathlitikos Sykeon","hg":60,"ag":76,"source":"thesportsdb"}
+{"sport":"baloncesto","league":"EuroCup Women","date":"2026-11-25","home":"Olympiacos Basketball Women","away":"Ślęza Wrocław Basketball Women","hg":100,"ag":67,"source":"thesportsdb"}
+{"sport":"béisbol","league":"Mexican Pacific League","date":"2026-11-25","home":"Venados de Mazatlán","away":"Yaquis de Obregón","hg":1,"ag":7,"source":"thesportsdb"}
+{"sport":"béisbol","league":"Mexican Pacific League","date":"2026-11-25","home":"Cañeros de Los Mochis","away":"Algodoneros de Guasave","hg":2,"ag":4,"source":"thesportsdb"}
+{"sport":"béisbol","league":"Mexican Pacific League","date":"2026-11-25","home":"Mayos de Navojoa","away":"Tomateros de Culiacán","hg":4,"ag":7,"source":"thesportsdb"}
+{"sport":"fútbol","league":"Brazilian Serie A","date":"2026-11-25","home":"Atlético Mineiro","away":"Corinthians","hg":1,"ag":1,"source":"thesportsdb"}
+{"sport":"fútbol","league":"Georgian Erovnuli Liga","date":"2026-11-25","home":"Rustavi","away":"Meshakhte Tkibuli","hg":2,"ag":1,"source":"thesportsdb"}
+{"sport":"fútbol","league":"Georgian Erovnuli Liga","date":"2026-11-25","home":"Samgurali Tskhaltubo","away":"Torpedo Kutaisi","hg":0,"ag":1,"source":"thesportsdb"}
+{"sport":"fútbol americano","league":"NCAA Division 1 Football","date":"2026-11-25","home":"Eastern Michigan","away":"Kent State","hg":17,"ag":12,"source":"thesportsdb"}
+{"sport":"fútbol americano","league":"NCAA Division 1 Football","date":"2026-11-25","home":"Western Michigan","away":"Miami (OH)","hg":24,"ag":28,"source":"thesportsdb"}
+{"sport":"fútbol americano","league":"NFL","date":"2026-11-25","home":"GB","away":"LA","hg":13,"ag":26,"source":"nflverse"}
+{"sport":"hockey hielo","league":"Russian KHL","date":"2026-11-25","home":"Barys Nur-Sultan","away":"Severstal Cherepovets","hg":2,"ag":1,"source":"thesportsdb"}
+{"sport":"hockey hielo","league":"Russian KHL","date":"2026-11-25","home":"Torpedo Nizhny Novgorod","away":"Sibir Novosibirsk","hg":5,"ag":3,"source":"thesportsdb"}
+{"sport":"hockey hielo","league":"Russian KHL","date":"2026-11-25","home":"SKA Saint Petersburg","away":"Lokomotiv Yaroslavl","hg":2,"ag":3,"source":"thesportsdb"}
+{"sport":"hockey hielo","league":"NHL","date":"2026-11-25","home":"WPG","away":"BOS","hg":4,"ag":2,"source":"nhl-api"}
+{"sport":"hockey hielo","league":"NHL","date":"2026-11-25","home":"NYR","away":"BUF","hg":1,"ag":5,"source":"nhl-api"}
+{"sport":"hockey hielo","league":"NHL","date":"2026-11-25","home":"CAR","away":"TBL","hg":3,"ag":1,"source":"nhl-api"}
+{"sport":"hockey hielo","league":"NHL","date":"2026-11-25","home":"OTT","away":"FLA","hg":3,"ag":5,"source":"nhl-api"}
+{"sport":"hockey hielo","league":"NHL","date":"2026-11-25","home":"STL","away":"NYI","hg":2,"ag":3,"source":"nhl-api"}
+{"sport":"hockey hielo","league":"NHL","date":"2026-11-25","home":"CGY","away":"PIT","hg":6,"ag":3,"source":"nhl-api"}
+{"sport":"hockey hielo","league":"NHL","date":"2026-11-25","home":"PHI","away":"WSH","hg":3,"ag":7,"source":"nhl-api"}
+{"sport":"hockey hielo","league":"NHL","date":"2026-11-25","home":"NJD","away":"CBJ","hg":3,"ag":2,"source":"nhl-api"}
+{"sport":"hockey hielo","league":"NHL","date":"2026-11-25","home":"VAN","away":"DET","hg":1,"ag":5,"source":"nhl-api"}
+{"sport":"hockey hielo","league":"NHL","date":"2026-11-25","home":"NSH","away":"DAL","hg":3,"ag":1,"source":"nhl-api"}
+{"sport":"hockey hielo","league":"NHL","date":"2026-11-25","home":"UTA","away":"MIN","hg":4,"ag":3,"source":"nhl-api"}
+{"sport":"hockey hielo","league":"NHL","date":"2026-11-25","home":"MTL","away":"COL","hg":0,"ag":6,"source":"nhl-api"}
+{"sport":"hockey hielo","league":"NHL","date":"2026-11-25","home":"CHI","away":"SEA","hg":3,"ag":1,"source":"nhl-api"}
+{"sport":"hockey hielo","league":"NHL","date":"2026-11-25","home":"SJS","away":"ANA","hg":0,"ag":7,"source":"nhl-api"}
