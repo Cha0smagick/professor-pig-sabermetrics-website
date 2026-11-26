@@ -1,4 +1,4 @@
-/* Sabermetría — laboratorio y predicción, cálculo íntegro en el navegador. */
+/* Professor Pigskin's Sports Predictor — cálculo íntegro en el navegador. */
 "use strict";
 
 const MAXG = 15;

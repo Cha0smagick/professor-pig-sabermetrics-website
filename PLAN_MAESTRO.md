@@ -1,4 +1,4 @@
-# PLAN MAESTRO — SABERMETRÍA · MOTOR PREDICTIVO DEPORTIVO
+# PLAN MAESTRO — PROFESSOR PIGSKIN'S SPORTS PREDICTOR
 
 > **Estado**: vivo. Cada paso se marca `[ ]` → `[x]` solo con su evidencia ejecutada.
 > **Fecha**: 2026-11-25.

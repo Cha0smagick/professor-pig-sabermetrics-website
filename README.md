@@ -1,10 +1,10 @@
-# Sabermetría
+# Professor Pigskin's Sports Predictor
 
 Motor predictivo y laboratorio estadístico de fútbol. Aprende fuerzas de ataque y defensa por equipo desde resultados reales, valida cada temporada con walk-forward estricto y publica todo como una web estática: sin backend, sin claves API y sin llamadas externas en runtime.
 
 ## Estado actual
 
-- **Datos hasta**: 2026-03-09 (último partido con marcador en la base histórica; los resultados diarios se añaden aparte).
+- **Datos hasta**: 2026-11-24 (histórico base + actualización diaria).
 - **Cobertura**: 87.224 partidos · 39 competiciones · 1.200 equipos · 19 temporadas.
 - **Modelo publicado**: híbrido **50% Dixon-Coles + 50% XGBoost**, con el peso fijado a priori.
 - **Walk-forward** (n=26.838, 5 temporadas por liga): Brier **0.6126** frente a 0.6512 del baseline; log-loss 1.0216; acierto 48.4%.
@@ -90,7 +90,7 @@ El repositorio incluye dos workflows:
 
 ```powershell
 git add .
-git commit -m "Sabermetria: motor y laboratorio"
+git commit -m "Professor Pigskin's: motor y laboratorio"
 git branch -M main
 git remote add origin https://github.com/<usuario>/<repo>.git
 git push -u origin main

@@ -5,18 +5,19 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="referrer" content="no-referrer">
 <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; connect-src 'self'; object-src 'none'; base-uri 'none'; form-action 'none'">
-<title>Sabermetría · Laboratorio predictivo</title>
-<meta name="description" content="Laboratorio estadístico de fútbol: resultados históricos, forma, Elo, medio tiempo, árbitros y probabilidades con un modelo Dixon-Coles validado walk-forward.">
+<title>Professor Pigskin's Sports Predictor</title>
+<meta name="description" content="Professor Pigskin's Sports Predictor: laboratorio estadístico de fútbol con probabilidades, calibración, intervalos de confianza y resultados diarios de otros deportes.">
+<link rel="icon" href="assets/pigskin.png" type="image/png">
 <link rel="stylesheet" href="styles.css">
 </head>
 <body>
 <a class="skip" href="#main">Saltar al contenido</a>
 <header class="top">
   <div class="brand">
-    <svg viewBox="0 0 32 32" aria-hidden="true" class="mark"><path d="M4 26 L12 6 L20 26 M8 19 H16" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"/><circle cx="24" cy="9" r="3" fill="currentColor"/></svg>
+    <img class="logo" src="assets/pigskin.png" alt="" width="60" height="76">
     <div>
-      <h1>SABERMETRÍA</h1>
-      <p>Laboratorio estadístico · Dixon-Coles validado</p>
+      <h1>Professor Pigskin's</h1>
+      <p>Sports Predictor · laboratorio estadístico</p>
     </div>
   </div>
   <div class="stamp" id="dataStamp" aria-live="polite">cargando datos…</div>
@@ -353,7 +354,7 @@
 </main>
 
 <footer>
-  <p>Datos: <a href="https://github.com/openfootball/football.json" rel="noopener">openfootball</a> (CC BY-SA) y cache local de API-Football. Modelo: Dixon-Coles con decaimiento temporal. Cálculo íntegro en tu navegador.</p>
+  <p>Professor Pigskin's Sports Predictor · Datos: <a href="https://github.com/openfootball/football.json" rel="noopener noreferrer">openfootball</a> (CC BY-SA), API-Football y fuentes públicas. Modelo: híbrido Dixon-Coles + XGBoost. Cálculo íntegro en tu navegador.</p>
 </footer>
 
 <script src="app.js"></script>
