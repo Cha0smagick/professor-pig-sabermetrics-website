@@ -236,10 +236,12 @@ function setupTabs() {
     ["tab-data", "panel-data", "#datos"],
     ["tab-model", "panel-model", "#modelo"],
   ];
+  const buttons = tabs.map(([buttonId]) => $(buttonId));
   const activate = (tabId) => {
     for (const [buttonId, panelId] of tabs) {
       const selected = buttonId === tabId;
       $(buttonId).setAttribute("aria-selected", String(selected));
+      $(buttonId).tabIndex = selected ? 0 : -1;
       $(panelId).hidden = !selected;
     }
   };
@@ -249,8 +251,23 @@ function setupTabs() {
       history.replaceState(null, "", hash);
     });
   }
+  buttons.forEach((button) => { button.tabIndex = button.getAttribute("aria-selected") === "true" ? 0 : -1; });
+  document.querySelector("nav.tabs").addEventListener("keydown", (event) => {
+    if (event.key !== "ArrowRight" && event.key !== "ArrowLeft") return;
+    const index = buttons.indexOf(document.activeElement);
+    if (index < 0) return;
+    event.preventDefault();
+    const step = event.key === "ArrowRight" ? 1 : -1;
+    const next = buttons[(index + step + buttons.length) % buttons.length];
+    next.focus();
+    next.click();
+  });
   const fromHash = tabs.find(([, , hash]) => hash === location.hash);
   if (fromHash) activate(fromHash[0]);
+  window.addEventListener("hashchange", () => {
+    const match = tabs.find(([, , hash]) => hash === location.hash);
+    if (match) activate(match[0]);
+  });
 }
 
 /* ---------- predecir ---------- */
@@ -389,7 +406,7 @@ function renderContext() {
   const formRow = (team) => `
     <div class="ctx-team">
       <div><strong>${esc(team.name)}</strong><span class="note">${team.m} PJ · ${team.pts} pts · Elo ${team.elo}</span></div>
-      <div class="form">${team.form.split("").map((r) => `<i class="${esc(r)}">${esc(r)}</i>`).join("") || "—"}</div>
+      <div class="form">${team.form.split("").map((r) => `<i class="${esc(r)}">${esc(formEs(r))}</i>`).join("") || "—"}</div>
       <div class="ctx-metrics">
         <span>Local ${team.home.pts} pts</span>
         <span>Visitante ${team.away.pts} pts</span>
@@ -529,9 +546,18 @@ function labTeamRows(lab) {
   return rows;
 }
 
+function formEs(form) {
+  return String(form || "").replace(/W/g, "V").replace(/D/g, "E").replace(/L/g, "D");
+}
+
 function renderLabTeams(lab) {
   const rows = labTeamRows(lab);
   $("labTeamCount").textContent = `${rows.length} de ${scopedTeams(lab).length} equipos`;
+  const head = $("labTeamsTable").querySelector("thead");
+  for (const th of head.querySelectorAll("th[data-sort]")) {
+    const active = th.dataset.sort === state.labSort.key;
+    th.setAttribute("aria-sort", active ? (state.labSort.dir === 1 ? "ascending" : "descending") : "none");
+  }
   $("labTeams").innerHTML = rows.map((team) => `
     <tr>
       <td class="rank">${team.rank}</td>
@@ -541,7 +567,7 @@ function renderLabTeams(lab) {
       <td><strong>${team.pts}</strong></td><td>${num(team.ppg, 2)}</td>
       <td>${pct(team.over25_rate)}</td><td>${pct(team.btts_rate)}</td>
       <td>${team.elo}</td><td class="${team.luck >= 0 ? "pos" : "neg"}">${signed(team.luck, 1)}</td>
-      <td><span class="form">${team.form.split("").map((r) => `<i class="${esc(r)}">${esc(r)}</i>`).join("")}</span></td>
+      <td><span class="form">${team.form.split("").map((r) => `<i class="${esc(r)}">${esc(formEs(r))}</i>`).join("")}</span></td>
     </tr>`).join("") || `<tr><td colspan="16" class="muted">Sin resultados</td></tr>`;
 }
 
@@ -563,7 +589,7 @@ function renderTeamDetail(lab, name) {
       <div class="metric"><span class="k">Puntos</span><strong>${team.pts}</strong><span class="note">${num(team.ppg, 2)} por partido</span></div>
       <div class="metric"><span class="k">Goles</span><strong>${team.gf}–${team.ga}</strong><span class="note">DG ${signed(team.gd, 0)}</span></div>
       <div class="metric"><span class="k">Pythagorean</span><strong>${num(team.pyth, 1)}</strong><span class="note">Suerte ${signed(team.luck, 1)} pts</span></div>
-      <div class="metric"><span class="k">Forma</span><strong>${esc(team.streak || "—")}</strong><span class="note">${esc(team.form || "sin partidos")}</span></div>
+      <div class="metric"><span class="k">Forma</span><strong>${esc(formEs(team.streak) || "—")}</strong><span class="note">${esc(team.form ? formEs(team.form) : "sin partidos")}</span></div>
     </div>
     <div class="grid two">
       <div>
@@ -591,6 +617,7 @@ function renderTeamDetail(lab, name) {
         <ul class="h2h">${rows || "<li class='note'>Sin enfrentamientos.</li>"}</ul>
       </div>
     </div>`;
+  card.querySelectorAll("th").forEach((th) => { th.scope = "col"; });
   $("rivalSelect").addEventListener("change", (event) => {
     state.rival = event.target.value;
     renderTeamDetail(lab, name);
@@ -685,13 +712,26 @@ function setupLab() {
       if (state.team) renderTeamDetail(state.labView, state.team);
     }
   });
-  $("labTeamsTable").querySelector("thead").addEventListener("click", (event) => {
+  const table = $("labTeamsTable");
+  const head = table.querySelector("thead");
+  for (const th of table.querySelectorAll("th")) {
+    th.scope = "col";
+    if (th.dataset.sort) th.tabIndex = 0;
+  }
+  head.addEventListener("click", (event) => {
     const th = event.target.closest("th[data-sort]");
     if (!th) return;
     const key = th.dataset.sort;
     if (state.labSort.key === key) state.labSort.dir *= -1;
     else state.labSort = { key, dir: key === "name" ? 1 : -1 };
     if (state.labView) renderLabTeams(state.labView);
+  });
+  head.addEventListener("keydown", (event) => {
+    if (event.key !== "Enter" && event.key !== " ") return;
+    const th = event.target.closest("th[data-sort]");
+    if (!th) return;
+    event.preventDefault();
+    th.click();
   });
   $("labTeams").addEventListener("click", (event) => {
     const button = event.target.closest("button[data-team]");
@@ -789,7 +829,7 @@ function renderData() {
       <div><span>Partidos válidos</span><strong>${t.matches.toLocaleString("es-ES")}</strong></div>
     </div>
     <h3>Registros descartados</h3>
-    <table class="mini"><thead><tr><th>Motivo</th><th>N</th></tr></thead><tbody>${rejectedRows}</tbody></table>
+    <table class="mini"><thead><tr><th scope="col">Motivo</th><th scope="col">N</th></tr></thead><tbody>${rejectedRows}</tbody></table>
     <p class="note">Se descartan partidos sin marcador final, con goles fuera de rango, fechas inválidas o duplicados.</p>`;
 
   const advanced = index.data_quality.advanced_sample || { n: 0, rows: [] };
@@ -916,6 +956,45 @@ function renderModel() {
   }).filter(Boolean).join("");
 }
 
+function renderMarketing() {
+  const metrics = DATA.metrics;
+  const agg = metrics.aggregate || {};
+  const totals = metrics.totals || {};
+  const lab = (DATA.labIndex && DATA.labIndex.totals) || {};
+  const ci = agg.inference && agg.inference.brier_ci;
+  const matches = (totals.matches || 0).toLocaleString("es-ES");
+  const leagues = totals.leagues || 0;
+  const teams = (lab.teams || 0).toLocaleString("es-ES");
+  const brier = agg.brier !== null && agg.brier !== undefined ? Number(agg.brier).toFixed(3) : "—";
+
+  const micro = document.querySelector(".hero-micro");
+  if (micro && metrics.data_through) {
+    micro.textContent = `Datos hasta ${metrics.data_through} · gratis, sin registro, sin cookies. El cálculo ocurre en tu navegador.`;
+  }
+
+  $("proofMatches").textContent = matches;
+  $("proofLeagues").textContent = leagues;
+  $("proofTeams").textContent = teams;
+  $("proofBrier").textContent = `Brier ${brier}`;
+  $("proofCI").textContent = ci ? `[${Number(ci[0]).toFixed(3)}–${Number(ci[1]).toFixed(3)}]` : "—";
+}
+
+function scrollToSection(id, focusId) {
+  const target = document.getElementById(id);
+  if (!target) return;
+  target.scrollIntoView({ behavior: "smooth", block: "start" });
+  if (focusId) {
+    const field = document.getElementById(focusId);
+    if (field) setTimeout(() => field.focus({ preventScroll: true }), 350);
+  }
+}
+
+function setupMarketing() {
+  $("heroCta").addEventListener("click", () => scrollToSection("predictControls", "league"));
+  $("heroHow").addEventListener("click", () => scrollToSection("como-se-mide"));
+  $("finalCta").addEventListener("click", () => scrollToSection("predictControls", "league"));
+}
+
 /* ---------- arranque ---------- */
 function setupPredict() {
   fillLeagueSelect($("league"), playableLeagues());
@@ -943,11 +1022,12 @@ function setupPredict() {
   if (playable.length) setLeague(playable[0].code);
   else {
     $("predictEmpty").hidden = false;
-    $("predictEmpty").textContent = "No hay competiciones validadas todavía. Ejecuta el build.";
+    $("predictEmpty").textContent = "Aún no hay competiciones validadas. Solo se publican ligas con evidencia suficiente.";
   }
 }
 
 async function boot() {
+  document.querySelectorAll("th").forEach((th) => { if (!th.scope) th.scope = "col"; });
   setupTabs();
   try {
     const [leagues, ratings, metrics, labIndex, hybrid, live, sources] = await Promise.all([
@@ -970,12 +1050,15 @@ async function boot() {
 
     setupPredict();
     setupLab();
+    setupMarketing();
+    renderMarketing();
     renderData();
     renderModel();
   } catch (error) {
     $("dataStamp").textContent = "datos no disponibles";
     $("predictEmpty").hidden = false;
-    $("predictEmpty").textContent = `No se pudieron cargar los datos (${error.message}). Sirve la carpeta site/ por HTTP: python -m http.server 8000 -d site`;
+    $("predictEmpty").textContent = "No se pudieron cargar los datos. Revisa tu conexión y recarga la página.";
+    console.error(error);
   }
 }
 

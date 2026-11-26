@@ -5,6 +5,16 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="referrer" content="no-referrer">
 <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; connect-src 'self'; object-src 'none'; base-uri 'none'; form-action 'none'">
+<meta name="theme-color" content="#08120f">
+<meta property="og:type" content="website">
+<meta property="og:title" content="Professor Pigskin's — El fútbol no se adivina: se mide">
+<meta property="og:description" content="Probabilidades de fútbol con un modelo híbrido Dixon-Coles + XGBoost, intervalos de confianza y actualización diaria. Publico el acierto y el error. Sin registro ni cookies.">
+<meta property="og:image" content="https://cha0smagick.github.io/professor-pig-sabermetrics-website/assets/og.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:url" content="https://cha0smagick.github.io/professor-pig-sabermetrics-website/">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:image" content="https://cha0smagick.github.io/professor-pig-sabermetrics-website/assets/og.png">
 <title>Professor Pigskin's Sports Predictor</title>
 <meta name="description" content="Professor Pigskin's Sports Predictor: laboratorio estadístico de fútbol con probabilidades, calibración, intervalos de confianza y resultados diarios de otros deportes.">
 <link rel="icon" href="assets/pigskin.png" type="image/png">
@@ -33,7 +43,18 @@
 <main id="main">
   <!-- PREDECIR -->
   <section id="panel-predict" role="tabpanel" aria-labelledby="tab-predict">
-    <div class="card controls">
+    <section class="hero">
+      <p class="eyebrow">Laboratorio abierto · modelo híbrido validado</p>
+      <h2 class="hero-title">El fútbol no se adivina.<br><span>Se mide.</span></h2>
+      <p class="hero-sub">Probabilidades temporada a temporada, con datos hasta ayer. Publico el acierto y también su error: si el partido está abierto, lo vas a saber.</p>
+      <div class="hero-actions">
+        <button class="btn primary" type="button" id="heroCta">Probar un partido</button>
+        <button class="btn ghost" type="button" id="heroHow">Ver cómo se mide</button>
+      </div>
+      <p class="hero-micro">Gratis, sin registro, sin cookies. El cálculo ocurre en tu navegador.</p>
+    </section>
+
+    <div class="card controls" id="predictControls">
       <div class="field">
         <label for="league">Competición</label>
         <select id="league"></select>
@@ -111,6 +132,103 @@
         <div class="grid two" id="contextBody"></div>
       </div>
     </div>
+
+    <section class="section" id="como-se-mide">
+      <div class="section-head">
+        <p class="eyebrow">El método</p>
+        <h2>Tres pasos y ningún misterio</h2>
+      </div>
+      <div class="steps">
+        <article class="step">
+          <span class="step-number">01</span>
+          <h3>Elige el cruce</h3>
+          <p>Dos equipos y una competición. Sin registro, sin cuenta, sin email.</p>
+        </article>
+        <article class="step">
+          <span class="step-number">02</span>
+          <h3>El modelo hace números</h3>
+          <p>Dixon-Coles pone las fuerzas de ataque y defensa. XGBoost pone el contexto: Elo, forma y descanso. 50/50, fijado antes de ver los resultados.</p>
+        </article>
+        <article class="step">
+          <span class="step-number">03</span>
+          <h3>Lee la letra pequeña</h3>
+          <p>Probabilidad, goles esperados, marcadores y cuotas justas. Y el margen del favorito: si es bajo, el partido está abierto.</p>
+        </article>
+      </div>
+    </section>
+
+    <section class="section proof" id="por-que">
+      <div class="section-head">
+        <p class="eyebrow">Por qué confiar</p>
+        <h2>No me creas. Compruébalo.</h2>
+      </div>
+      <div class="proof-grid">
+        <article class="proof-card">
+          <span class="proof-kicker">Datos</span>
+          <strong id="proofMatches">—</strong>
+          <p>partidos reales en <span id="proofLeagues">—</span> competiciones y <span id="proofTeams">—</span> equipos. Nada escrito a mano: sale de <code>metrics.json</code> en cada build.</p>
+        </article>
+        <article class="proof-card">
+          <span class="proof-kicker">Error</span>
+          <strong id="proofBrier">—</strong>
+          <p>Brier con <span id="proofCI">—</span> de IC95% por bootstrap de bloques semanales. Es el error de la métrica agregada, no un IC por partido: un IC por pronóstico sería falsa precisión.</p>
+        </article>
+        <article class="proof-card">
+          <span class="proof-kicker">Sin humo</span>
+          <strong>0 cuotas</strong>
+          <p>El modelo no ve cuotas ni apuestas. Si quieres comparar con la casa, el campo es opcional y el cálculo es tuyo. Nada de esto es consejo de apuestas.</p>
+        </article>
+      </div>
+      <div class="not-list">
+        <h3>Lo que no vas a encontrar aquí</h3>
+        <ul>
+          <li>Picks, suscripción, Telegram ni «fijo del día».</li>
+          <li>Probabilidades para deportes sin histórico validado.</li>
+          <li>xG estimado donde no hay tiros.</li>
+          <li>Ligas que no pasan el control de falsos descubrimientos al 5%.</li>
+          <li>Promesas de rentabilidad: un 60% falla 4 de cada 10 veces.</li>
+        </ul>
+      </div>
+    </section>
+
+    <section class="section merch" id="merch">
+      <div class="section-head">
+        <p class="eyebrow">Marca</p>
+        <h2>Sin tienda. Solo ideas.</h2>
+        <p class="section-sub">Cuando exista, habrá tres cosas. Y ningún precio hasta que exista.</p>
+      </div>
+      <div class="merch-grid">
+        <article class="merch-card">
+          <div class="merch-art shirt"><img src="assets/pigskin.png" alt=""></div>
+          <span class="badge">Próximamente</span>
+          <h3>Camiseta</h3>
+          <p>«Un 60% falla 4 de cada 10 veces», en el pecho. En la espalda, nada: el que sabe, no presume.</p>
+        </article>
+        <article class="merch-card">
+          <div class="merch-art mug"><img src="assets/pigskin.png" alt=""></div>
+          <span class="badge">Próximamente</span>
+          <h3>Taza</h3>
+          <p>Para las 06:00, cuando entran los resultados del día anterior.</p>
+        </article>
+        <article class="merch-card">
+          <div class="merch-art poster">
+            <svg viewBox="0 0 120 90" aria-hidden="true"><line x1="10" y1="80" x2="110" y2="10" stroke="currentColor" stroke-width="1" stroke-dasharray="3 4"/><path d="M10 72 L28 62 L46 58 L64 40 L82 34 L100 18" fill="none" stroke="currentColor" stroke-width="2.4"/><circle cx="10" cy="72" r="2.2"/><circle cx="28" cy="62" r="2.2"/><circle cx="46" cy="58" r="2.2"/><circle cx="64" cy="40" r="2.2"/><circle cx="82" cy="34" r="2.2"/><circle cx="100" cy="18" r="2.2"/></svg>
+            <img src="assets/pigskin.png" alt="">
+          </div>
+          <span class="badge">Próximamente</span>
+          <h3>Póster</h3>
+          <p>Predicho vs. observado. La diagonal es el ideal. Enmarcado parece arte; es un diagnóstico.</p>
+        </article>
+      </div>
+      <p class="note">Sin reservas, sin lista de espera, sin emails.</p>
+    </section>
+
+    <section class="final-cta">
+      <p class="eyebrow">El siguiente partido</p>
+      <h2>Ya tiene probabilidad. Y tiene error. Míralos juntos.</h2>
+      <button class="btn primary" type="button" id="finalCta">Predecir un partido</button>
+      <p class="note">Si el modelo falla, lo verás en la pestaña Modelo antes de que lo busques.</p>
+    </section>
   </section>
 
   <!-- LABORATORIO -->
