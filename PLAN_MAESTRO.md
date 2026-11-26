@@ -15,7 +15,7 @@
 
 **No es**: un LLM que "adivina" partidos. No hay agentes conversacionales en runtime. No se predicen deportes sin datos. No se promete rentabilidad.
 
-**Deporte activo**: fútbol. Motivo medido: 87.224 partidos con marcador en 39 competiciones (92.900 registros, 4.932 sin marcador); **0 ficheros** de basketball/NFL/NHL/MLB/tenis en todo el repo (auditoría D). La arquitectura queda parametrizada por `sport` para añadir otros cuando existan datos; hoy inventar cifras sería mentir.
+**Deporte activo**: fútbol. Motivo medido: 87.224 partidos con marcador en 39 competiciones (92.900 registros, 4.932 sin marcador). No hay histórico de otros deportes; el actualizador diario ya trae resultados de NHL/MLB/NFL/TheSportsDB, pero sin modelo validado. La arquitectura queda parametrizada por `sport`; inventar cifras sería mentir.
 
 ---
 

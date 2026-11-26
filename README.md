@@ -129,9 +129,11 @@ sabermetria/            motor Python puro
   cli.py                build / ingest / update / backtest / predict
 site/                   web estática (GitHub Pages)
   index.html app.js styles.css
+  assets/pigskin.png    logo con fondo transparente
   data/                 leagues, ratings, metrics, hybrid, sources, live, lab/
 tests/                  pytest
 data/                   cache normalizada, alias y resultados diarios
+assets/                 imagen original del cerdo
 legacy/                 código histórico archivado (no se usa)
 ```
 

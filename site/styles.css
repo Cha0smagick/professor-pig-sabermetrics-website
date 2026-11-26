@@ -139,6 +139,7 @@ button.ghost.small { padding: 7px 10px; font-size: 12px; }
   font: 11px/1 var(--mono); padding: 6px 9px; border-radius: 999px;
   border: 1px solid var(--line); color: var(--muted); white-space: nowrap;
 }
+.card-head .tag { white-space: normal; max-width: 62%; text-align: right; line-height: 1.4; }
 .tag.ok { color: var(--green); border-color: var(--green-dim); background: #0d2418; }
 .tag.warn { color: var(--amber); border-color: #5a4720; background: #241d0d; }
 
