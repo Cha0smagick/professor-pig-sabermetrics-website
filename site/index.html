@@ -3,6 +3,8 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="referrer" content="no-referrer">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; connect-src 'self'; object-src 'none'; base-uri 'none'; form-action 'none'">
 <title>Sabermetría · Laboratorio predictivo</title>
 <meta name="description" content="Laboratorio estadístico de fútbol: resultados históricos, forma, Elo, medio tiempo, árbitros y probabilidades con un modelo Dixon-Coles validado walk-forward.">
 <link rel="stylesheet" href="styles.css">
@@ -94,7 +96,7 @@
           <h2>Valor contra cuotas</h2>
           <button id="clearOdds" class="ghost small" type="button">Limpiar</button>
         </div>
-        <p class="note">Introduce las cuotas decimales de tu casa. Se muestra el valor esperado (EV) y la fracción de Kelly al 25% con tope del 5% de banca. No es consejo de apuestas.</p>
+        <p class="note">Introduce las cuotas decimales de tu casa. Se muestra el valor esperado (EV) y la fracción de Kelly al 25% con tope del 5% de banca. El EV no incorpora la incertidumbre del modelo: es una estimación puntual, no una garantía. No es consejo de apuestas.</p>
         <div class="odds-grid">
           <div class="field"><label for="oddsHome">Gana local</label><input id="oddsHome" type="number" min="1.01" step="0.01" inputmode="decimal" placeholder="2.10"></div>
           <div class="field"><label for="oddsDraw">Empate</label><input id="oddsDraw" type="number" min="1.01" step="0.01" inputmode="decimal" placeholder="3.40"></div>
@@ -139,6 +141,7 @@
         <h2>Resultados por temporada</h2>
         <div id="seasonChart" class="chart"></div>
         <p class="note">Reparto local / empate / visitante en cada temporada. La altura total es siempre 100%.</p>
+        <p class="note" id="trendNote"></p>
       </div>
       <div class="card">
         <h2>Goles por partido</h2>
@@ -163,11 +166,17 @@
     </div>
 
     <div class="card">
+      <div class="card-head"><h2>Diagnóstico del modelo</h2><span class="tag" id="diagTag">—</span></div>
+      <div class="meta-list" id="diagnostics"></div>
+      <p class="note">Bondad de ajuste de la distribución de goles frente a Poisson y sobredispersión. Es un diagnóstico interno (in-sample), no una validación predictiva. Un índice de dispersión &gt; 1 indica más varianza que la que asume Poisson. Con miles de partidos, el chi-cuadrado detecta desviaciones mínimas: el índice de dispersión es la lectura práctica.</p>
+    </div>
+
+    <div class="card">
       <div class="card-head">
         <h2>Equipos</h2>
         <span class="note" id="labTeamCount"></span>
       </div>
-      <p class="note">Ordena pulsando las cabeceras. Clic en un equipo para abrir su perfil y el historial contra un rival.</p>
+      <p class="note">Ordena pulsando las cabeceras. Clic en un equipo para abrir su perfil y el historial contra un rival. Las fuerzas son estimaciones puntuales contraídas; no se publica IC por parámetro porque la dirección ataque+defensa no está identificada. La incertidumbre se expresa en la distribución de probabilidad del partido.</p>
       <div class="table-scroll">
         <table class="data sortable" id="labTeamsTable">
           <thead><tr>
@@ -196,9 +205,9 @@
     <div class="card" id="teamDetail" hidden></div>
     <div class="card" id="refCard" hidden>
       <h2>Árbitros</h2>
-      <p class="note">Solo competiciones con árbitro en la fuente (Colombia 2022-2024). Mínimo 8 partidos. Es descriptivo: no implica causalidad.</p>
+      <p class="note">Solo competiciones con árbitro en la fuente (Colombia 2022-2024). Mínimo 20 partidos. Los intervalos son Wilson al 95%. Es descriptivo: no implica causalidad.</p>
       <div class="table-scroll">
-        <table class="data"><thead><tr><th>Árbitro</th><th>PJ</th><th>Goles/P</th><th>Local</th><th>Empate</th><th>+2.5</th></tr></thead><tbody id="refBody"></tbody></table>
+        <table class="data"><thead><tr><th>Árbitro</th><th>PJ</th><th>Goles/P</th><th>Local (IC95)</th><th>Empate</th><th>+2.5 (IC95)</th></tr></thead><tbody id="refBody"></tbody></table>
       </div>
     </div>
   </section>
@@ -207,6 +216,34 @@
   <section id="panel-data" role="tabpanel" aria-labelledby="tab-data" hidden>
     <div class="grid three" id="sportsGrid"></div>
     <div class="grid four" id="dataKpis"></div>
+
+    <div class="grid two">
+      <div class="card">
+        <div class="card-head"><h2>Actualización diaria</h2><span class="tag" id="liveTag">—</span></div>
+        <div class="meta-list" id="liveSummary"></div>
+        <p class="note">El workflow descarga cada día a las 06:00 (America/Bogota) los resultados del día anterior y reconstruye la web. Los partidos de fútbol entran al modelo; el resto se guarda como dato disponible para cuando haya histórico suficiente.</p>
+      </div>
+      <div class="card">
+        <h2>Otros deportes</h2>
+        <div class="meta-list" id="otherSports"></div>
+        <p class="note">Datos diarios cableados (NHL, MLB, NFL, TheSportsDB). Aún no hay modelo predictivo publicado para estos deportes: falta histórico suficiente y una distribución propia. No se inventan probabilidades.</p>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-head"><h2>Fuentes gratuitas</h2><span class="note" id="sourcesCount"></span></div>
+      <div class="table-scroll">
+        <table class="data"><thead><tr><th>Fuente</th><th>Deportes</th><th>Auth</th><th>Frecuencia</th><th>Licencia</th><th>Estado</th></tr></thead><tbody id="sourcesBody"></tbody></table>
+      </div>
+      <p class="note">Estado <strong>cableada</strong>: el actualizador diario la consulta. <strong>Disponible</strong>: endpoint libre documentado, aún no conectado. <strong>Manual</strong>: descarga o credenciales.</p>
+    </div>
+
+    <div class="card">
+      <div class="card-head"><h2>Últimos resultados descargados</h2><span class="note">Muestra de los eventos más recientes</span></div>
+      <div class="table-scroll">
+        <table class="data"><thead><tr><th>Fecha</th><th>Deporte</th><th>Competición</th><th>Local</th><th>Visitante</th><th>Marcador</th><th>Fuente</th></tr></thead><tbody id="liveEvents"></tbody></table>
+      </div>
+    </div>
 
     <div class="card">
       <div class="card-head"><h2>Cobertura por competición</h2><span class="note">Partidos con marcador final</span></div>
@@ -228,7 +265,7 @@
           <li><strong>Minutos de gol</strong>: openfootball no los incluye; no hay análisis de tramos.</li>
           <li><strong>Lesiones, sanciones, viajes, árbitro</strong>: solo Colombia tiene árbitro y sede.</li>
           <li><strong>Cuotas</strong>: no hay histórico de mercado; el valor se calcula contra la cuota que introduzcas.</li>
-          <li><strong>Otros deportes</strong>: no hay un solo partido de baloncesto, béisbol, NFL, NHL o tenis.</li>
+          <li><strong>Otros deportes</strong>: hay resultados diarios cableados (NHL, MLB, NFL, TheSportsDB), pero no histórico suficiente ni modelo publicado. No se muestran probabilidades inventadas.</li>
         </ul>
       </div>
     </div>
@@ -248,6 +285,20 @@
     <div class="grid four" id="metricCards"></div>
     <div class="grid two">
       <div class="card">
+        <h2>Comparación de modelos</h2>
+        <p class="note">Mismos partidos fuera de muestra. IC95% por bootstrap de bloques semanales. p unilateral: H1 = mejora el Brier del baseline.</p>
+        <div class="table-scroll">
+          <table class="data"><thead><tr><th>Modelo</th><th>n</th><th>Brier</th><th>IC95%</th><th>Log-loss</th><th>Acierto</th><th>Δ vs baseline</th><th>p</th></tr></thead><tbody id="benchmarkBody"></tbody></table>
+        </div>
+      </div>
+      <div class="card">
+        <h2>Inferencia y calibración</h2>
+        <div class="meta-list" id="inferenceCards"></div>
+        <p class="note" id="inferenceNote"></p>
+      </div>
+    </div>
+    <div class="grid two">
+      <div class="card">
         <h2>Calibración agregada</h2>
         <div id="relChartModel" class="chart"></div>
         <p class="note">Probabilidad predicha frente a frecuencia observada en los partidos de validación. La diagonal es el ideal.</p>
@@ -256,20 +307,20 @@
         <h2>Cómo funciona</h2>
         <ol class="method">
           <li><strong>Datos</strong>: <span id="mMatches">—</span> partidos y <span id="mLeagues">—</span> competiciones. openfootball 2010-2026 + API-Football Colombia 2022-2024.</li>
-          <li><strong>Modelo</strong>: ataque y debilidad defensiva por equipo; nivel medio y ventaja local por liga; goles Poisson con corrección Dixon-Coles en marcadores bajos.</li>
-          <li><strong>Tiempo</strong>: los partidos antiguos pesan menos (semivida elegida por liga).</li>
+          <li><strong>Dixon-Coles</strong>: ataque y debilidad defensiva por equipo; nivel medio y ventaja local por liga; goles Poisson con corrección en marcadores bajos.</li>
+          <li><strong>XGBoost</strong>: features pre-partido (Elo, forma, goles recientes, descanso, experiencia) sin fuga temporal.</li>
+          <li><strong>Híbrido</strong>: 50% Dixon-Coles + 50% XGBoost, peso fijado a priori. Solo se usa si mejora en la comparación fuera de muestra.</li>
           <li><strong>Calibración</strong>: contracción al baseline de la liga, elegida en validación.</li>
-          <li><strong>Validación</strong>: walk-forward estricto. Cada temporada se predice entrenando solo con el pasado.</li>
-          <li><strong>Web</strong>: los parámetros se exportan a JSON y el navegador calcula la matriz. Sin servidor ni peticiones externas.</li>
+          <li><strong>Validación</strong>: walk-forward. Cada temporada se predice entrenando solo con el pasado; intervalos por bootstrap de bloques.</li>
         </ol>
       </div>
     </div>
     <div class="card">
-      <div class="card-head"><h2>Resultados por competición</h2><span class="note">Solo se publican predicciones de ligas validadas</span></div>
+      <div class="card-head"><h2>Resultados por competición</h2><span class="note">Solo se publican predicciones de ligas con evidencia suficiente (FDR 5%)</span></div>
       <div class="table-scroll">
-        <table class="data"><thead><tr><th>Competición</th><th>Estado</th><th>n</th><th>Brier</th><th>Baseline</th><th>Δ Brier</th><th>LogLoss</th><th>Acierto</th><th>Cobertura</th></tr></thead><tbody id="metricsBody"></tbody></table>
+        <table class="data"><thead><tr><th>Competición</th><th>Datos</th><th>Estado</th><th>n</th><th>Brier híbrido</th><th>Brier DC</th><th>IC95%</th><th>Δ vs baseline</th><th>p vs baseline</th><th>q baseline</th><th>Acierto</th><th>Cobertura</th></tr></thead><tbody id="metricsBody"></tbody></table>
       </div>
-      <p class="note">Δ Brier positivo: el modelo bate al baseline de frecuencias. Cobertura: partidos evaluables; los equipos sin historial se omiten.</p>
+      <p class="note">Δ y p son frente al baseline de frecuencias (no frente a DC). La comparación híbrido vs DC se testea en el bloque superior con los mismos partidos. q es el p ajustado por comparaciones múltiples (Benjamini-Hochberg). Cobertura: partidos evaluables; los equipos sin historial se omiten.</p>
     </div>
     <div class="card limits">
       <h2>Límites conocidos</h2>
@@ -280,6 +331,23 @@
         <li>Una probabilidad no es una certeza: un 60% falla 4 de cada 10 veces.</li>
         <li>Nada de esto es consejo financiero ni garantía de rentabilidad.</li>
       </ul>
+    </div>
+    <div class="card glossary">
+      <h2>Glosario mínimo</h2>
+      <dl>
+        <dt>Brier</dt><dd>Error cuadrático medio de las probabilidades. Menor es mejor; 0 sería perfecto.</dd>
+        <dt>Log-loss</dt><dd>Penaliza con fuerza estar muy seguro y equivocado. Menor es mejor.</dd>
+        <dt>BSS</dt><dd>Brier Skill Score: 1 − Brier modelo / Brier baseline. 0% = igual que el baseline; 10% = 10% mejor.</dd>
+        <dt>ECE</dt><dd>Error de calibración esperado: diferencia media entre probabilidad dicha y frecuencia observada.</dd>
+        <dt>IC95%</dt><dd>Rango de valores compatibles con los datos al 95%. Si cruza el cero en una mejora, no hay evidencia clara.</dd>
+        <dt>Bootstrap de bloques</dt><dd>Remuestreo por semanas completas para no fingir que los partidos son independientes.</dd>
+        <dt>q (FDR)</dt><dd>p ajustado por comparar muchas ligas a la vez. q≤0,05 controla el 5% de falsos descubrimientos.</dd>
+        <dt>Elo</dt><dd>Fuerza relativa histórica; 1500 es el punto de partida convencional. No es una probabilidad.</dd>
+        <dt>Pythagorean</dt><dd>Puntos esperados según goles a favor y en contra. “Suerte” = puntos reales − esperados.</dd>
+        <dt>EV y Kelly</dt><dd>EV = probabilidad × cuota − 1. Kelly es la fracción teórica de banca; aquí se limita al 5%.</dd>
+        <dt>BTTS</dt><dd>Both teams to score: ambos equipos marcan.</dd>
+        <dt>xG</dt><dd>Goles esperados por calidad de ocasión. No existe en estos datos; no se estima.</dd>
+      </dl>
     </div>
   </section>
 </main>

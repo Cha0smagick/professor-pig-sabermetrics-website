@@ -26,6 +26,7 @@ from .leagues import LEAGUES
 ROOT = Path(__file__).resolve().parent.parent
 DEFAULT_RAW = ROOT / "openfootball_data" / "football.json"
 DEFAULT_EXTRA = ROOT / "datos" / "raw"
+DEFAULT_LIVE = ROOT / "data" / "live_matches.jsonl"
 DEFAULT_CACHE = ROOT / "data" / "matches.jsonl.gz"
 DEFAULT_ALIASES = ROOT / "data" / "team_aliases.json"
 
@@ -196,6 +197,9 @@ def _parse(raw: Path, rejected: Counter) -> list[dict]:
         if code not in LEAGUES:
             continue
         season = path.parent.name
+        if not re.fullmatch(r"\d{4}(-\d{2})?", season):
+            rejected["temporada_invalida"] += 1
+            continue
         try:
             payload = json.loads(path.read_text(encoding="utf-8"))
         except (OSError, json.JSONDecodeError):
@@ -219,6 +223,13 @@ def _parse(raw: Path, rejected: Counter) -> list[dict]:
             if not day or not home or not away:
                 rejected["campos_incompletos"] += 1
                 continue
+            ht = _halftime(item.get("score"))
+            imputed = False
+            # Un 0-0 final implica 0-0 al descanso: imputarlo evita sesgar
+            # los goles por parte hacia arriba (los 0-0 sin ht no son aleatorios).
+            if ht is None and hg == 0 and ag == 0:
+                ht = [0, 0]
+                imputed = True
             matches.append(
                 {
                     "l": code,
@@ -228,7 +239,8 @@ def _parse(raw: Path, rejected: Counter) -> list[dict]:
                     "a": away,
                     "hg": hg,
                     "ag": ag,
-                    **({"ht": ht} if (ht := _halftime(item.get("score"))) else {}),
+                    **({"ht": ht} if ht else {}),
+                    **({"hti": True} if imputed else {}),
                 }
             )
     return matches
@@ -273,8 +285,12 @@ def _parse_api_football(folder: Path, rejected: Counter) -> list[dict]:
                 continue
             ht = (item.get("score") or {}).get("halftime") or {}
             half = None
+            imputed = False
             if isinstance(ht.get("home"), int) and isinstance(ht.get("away"), int):
                 half = [ht["home"], ht["away"]]
+            elif hg == 0 and ag == 0:
+                half = [0, 0]
+                imputed = True
             record = {
                 "l": "co.1",
                 "s": str(item.get("league", {}).get("season", "")),
@@ -287,6 +303,8 @@ def _parse_api_football(folder: Path, rejected: Counter) -> list[dict]:
             }
             if half:
                 record["ht"] = half
+            if imputed:
+                record["hti"] = True
             referee = item.get("fixture", {}).get("referee")
             venue = (item.get("fixture", {}).get("venue") or {}).get("name")
             if referee:
@@ -348,17 +366,41 @@ def load_raw(
     raw: Path = DEFAULT_RAW,
     aliases_out: Path | None = None,
     extra_dir: Path | None = None,
+    live: Path | None = None,
 ) -> tuple[list[dict], Counter]:
     rejected: Counter = Counter()
     matches = _parse(raw, rejected)
     if extra_dir is not None:
         matches.extend(_parse_api_football(Path(extra_dir), rejected))
+    if live is not None and Path(live).exists():
+        matches.extend(read_live(live))
     matches = _dedupe(matches, rejected)
     matches, aliases = _canonicalize(matches, rejected)
+    matches = _dedupe(matches, rejected)
     if aliases_out is not None:
         aliases_out.parent.mkdir(parents=True, exist_ok=True)
         aliases_out.write_text(json.dumps(aliases, ensure_ascii=False, indent=1), encoding="utf-8")
     return matches, rejected
+
+
+def read_live(path: Path = DEFAULT_LIVE) -> list[dict]:
+    if not Path(path).exists():
+        return []
+    rows = []
+    for line in Path(path).read_text(encoding="utf-8").splitlines():
+        line = line.strip()
+        if not line:
+            continue
+        try:
+            row = json.loads(line)
+        except json.JSONDecodeError:
+            continue
+        if not all(row.get(key) for key in ("l", "d", "h", "a")):
+            continue
+        if row.get("hg") is None or row.get("ag") is None:
+            continue
+        rows.append(row)
+    return rows
 
 
 def read_cache(path: Path = DEFAULT_CACHE) -> list[dict]:
@@ -383,13 +425,21 @@ def ingest(
     cache: Path = DEFAULT_CACHE,
     aliases: Path = DEFAULT_ALIASES,
     extra: Path | None = DEFAULT_EXTRA,
+    live: Path | None = DEFAULT_LIVE,
 ) -> tuple[list[dict], Counter]:
-    """Normaliza y persiste. Si el crudo no existe, lee la cache versionada."""
+    """Normaliza y persiste. Si el crudo no existe, usa la cache + resultados diarios."""
     if raw.exists():
-        matches, rejected = load_raw(raw, aliases, extra)
+        matches, rejected = load_raw(raw, aliases, extra, live)
         write_cache(matches, cache)
         return matches, rejected
-    return read_cache(cache), Counter()
+    rejected: Counter = Counter()
+    matches = read_cache(cache)
+    if live is not None and Path(live).exists():
+        matches.extend(read_live(live))
+    matches = _dedupe(matches, rejected)
+    matches, _ = _canonicalize(matches, rejected)
+    matches = _dedupe(matches, rejected)
+    return matches, rejected
 
 
 def summarize(matches: list[dict]) -> dict:

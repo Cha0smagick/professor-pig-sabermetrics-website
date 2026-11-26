@@ -7,11 +7,13 @@
  "au.1": {},
  "be.1": {},
  "br.1": {
+  "São Paulo": "São Paulo FC",
   "Ceará CE": "Ceará SC",
   "Palmeiras": "SE Palmeiras",
   "Fluminense RJ": "Fluminense FC",
   "SC Internacional": "Internacional",
   "Cruzeiro": "Cruzeiro EC",
+  "Santos": "Santos FC",
   "Sport Recife PE": "Sport Recife",
   "SC Recife": "Sport Recife"
  },
@@ -145,11 +147,13 @@
   "Hellas Verona": "Hellas Verona FC",
   "Sampdoria": "UC Sampdoria",
   "Lazio Roma": "SS Lazio",
+  "Lazio": "SS Lazio",
   "Parma FC": "Parma Calcio 1913",
   "Juventus FC": "Juventus",
   "Atalanta": "Atalanta BC",
   "Bologna FC": "Bologna FC 1909",
-  "US Sassuolo Calcio": "Sassuolo Calcio"
+  "US Sassuolo Calcio": "Sassuolo Calcio",
+  "Sassuolo": "Sassuolo Calcio"
  },
  "it.2": {
   "Reggina Calcio": "Reggina 1914",
@@ -183,7 +187,6 @@
   "GD Estoril": "GD Estoril Praia"
  },
  "ru.1": {},
- "ru.2": {},
  "sco.1": {},
  "tr.1": {
   "Atiker Konyaspor": "Konyaspor",

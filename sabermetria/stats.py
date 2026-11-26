@@ -10,7 +10,9 @@ import json
 from collections import Counter
 from pathlib import Path
 
-from . import ingest, ratings
+import numpy as np
+
+from . import ingest, inference, ratings
 
 PYTH_EXP = 1.7
 FORM_LENGTH = 10
@@ -90,7 +92,7 @@ def totals(matches: list[dict]) -> dict:
     n = len(matches)
     goals = home = away = over15 = over25 = over35 = btts = nil = clean = 0
     home_w = draws = 0
-    ht_n = ht_draw = ht_o05 = ht_o15 = g1h = g2h = comebacks = leads_lost = 0
+    ht_n = ht_draw = ht_o05 = ht_o15 = g1h = g2h = comebacks = leads_lost = ht_imputed = 0
     for match in matches:
         hg, ag = match["hg"], match["ag"]
         goals += hg + ag
@@ -107,18 +109,26 @@ def totals(matches: list[dict]) -> dict:
         ht = match.get("ht")
         if ht:
             ht_n += 1
+            if match.get("hti"):
+                ht_imputed += 1
             hth, hta = ht
             ht_draw += hth == hta
             ht_o05 += hth + hta > 0
             ht_o15 += hth + hta > 1
             g1h += hth + hta
             g2h += (hg + ag) - (hth + hta)
-            if hth > hta and hg < ag:
-                comebacks += 1
-                leads_lost += 1
-            elif hta > hth and hg > ag:
-                comebacks += 1
-                leads_lost += 1
+            if hth > hta:
+                # el local lideraba al descanso
+                if hg < ag:
+                    comebacks += 1
+                if hg <= ag:
+                    leads_lost += 1
+            elif hta > hth:
+                # el visitante lideraba al descanso
+                if hg > ag:
+                    comebacks += 1
+                if hg >= ag:
+                    leads_lost += 1
     return {
         "matches": n,
         "goals": goals,
@@ -128,7 +138,9 @@ def totals(matches: list[dict]) -> dict:
         "avg_home": round(home / n, 3) if n else 0.0,
         "avg_away": round(away / n, 3) if n else 0.0,
         "home_win": _rate(home_w, n),
+        "home_win_ci": list(inference.wilson_interval(home_w, n)),
         "draw": _rate(draws, n),
+        "draw_ci": list(inference.wilson_interval(draws, n)),
         "away_win": _rate(n - home_w - draws, n),
         "over15": _rate(over15, n),
         "over25": _rate(over25, n),
@@ -137,7 +149,10 @@ def totals(matches: list[dict]) -> dict:
         "clean_sheet": _rate(clean, n),
         "nil_nil": _rate(nil, n),
         "ht_matches": ht_n,
+        "ht_imputed": ht_imputed,
+        "ht_observed": ht_n - ht_imputed,
         "ht_coverage": _rate(ht_n, n),
+        "ht_observed_coverage": _rate(ht_n - ht_imputed, n),
         "ht_draw": _rate(ht_draw, ht_n),
         "ht_over05": _rate(ht_o05, ht_n),
         "ht_over15": _rate(ht_o15, ht_n),
@@ -214,15 +229,17 @@ def league_lab(matches: list[dict]) -> dict:
 
     ref_rows = []
     for entry in referees.values():
-        if entry["matches"] < 8:
+        if entry["matches"] < 20:
             continue
         ref_rows.append(
             {
                 **entry,
                 "avg_goals": round(entry["goals"] / entry["matches"], 3),
                 "home_win": _rate(entry["home"], entry["matches"]),
+                "home_win_ci": list(inference.wilson_interval(entry["home"], entry["matches"])),
                 "draw": _rate(entry["draw"], entry["matches"]),
                 "over25": _rate(entry["over25"], entry["matches"]),
+                "over25_ci": list(inference.wilson_interval(entry["over25"], entry["matches"])),
             }
         )
     ref_rows.sort(key=lambda row: -row["matches"])
@@ -231,6 +248,11 @@ def league_lab(matches: list[dict]) -> dict:
         {"season": season, **totals(rows)}
         for season, rows in sorted(seasons.items(), key=lambda item: min(m["d"] for m in item[1]))
     ]
+    trend = {
+        "avg_goals": inference.spearman_trend([row["avg_goals"] for row in season_rows]),
+        "home_win": inference.spearman_trend([row["home_win"] for row in season_rows]),
+        "over25": inference.spearman_trend([row["over25"] for row in season_rows]),
+    }
 
     index = {name: i for i, name in enumerate(names)}
     compact = [
@@ -249,6 +271,7 @@ def league_lab(matches: list[dict]) -> dict:
     return {
         "totals": totals(matches),
         "seasons": season_rows,
+        "trend": trend,
         "goals_distribution": [distribution.get(goals, 0) for goals in range(8)] + [sum(v for k, v in distribution.items() if k >= 8)],
         "scorelines": [[hg, ag, count] for (hg, ag), count in scorelines.most_common(TOP_SCORELINES)],
         "teamNames": names,
@@ -359,21 +382,67 @@ def _advanced_from_raw(root: Path) -> dict:
             if sot_h is not None and sot_a is not None:
                 pairs.append((float(sot_h - sot_a), float(hg - ag)))
 
-    correlation = None
-    if len(pairs) >= 5:
-        xs = [p[0] for p in pairs]
-        ys = [p[1] for p in pairs]
-        mx, my = sum(xs) / len(xs), sum(ys) / len(ys)
-        cov = sum((x - mx) * (y - my) for x, y in pairs)
-        vx = sum((x - mx) ** 2 for x in xs) ** 0.5
-        vy = sum((y - my) ** 2 for y in ys) ** 0.5
-        correlation = round(cov / (vx * vy), 3) if vx and vy else None
+    correlation = inference.pearson_with_ci([p[0] for p in pairs], [p[1] for p in pairs]) if len(pairs) >= 5 else {"r": None, "p": None, "ci": None, "n": len(pairs)}
 
     return {
         "n": len(rows),
         "rows": rows,
-        "correlation_sot_goals": correlation,
+        "correlation_sot_goals": correlation["r"],
+        "correlation_ci": correlation["ci"],
+        "correlation_p": correlation["p"],
         "note": f"Muestra piloto de API-Football: {len(rows)} partidos de Colombia 2022-2024. Sin xG (el campo llega nulo).",
+    }
+
+
+def model_diagnostics(model: ratings.LeagueModel, matches: list[dict]) -> dict:
+    """Bondad de ajuste de la distribucion de goles y sobredispersion (in-sample)."""
+    shape = ratings.MAX_GOALS + 1
+    grid = np.add.outer(np.arange(shape), np.arange(shape))
+    bins = [grid == k for k in range(8)]
+    tail = grid >= 8
+    observed = [0] * 8
+    expected = [0.0] * 8
+    observed_tail = 0
+    expected_tail = 0.0
+    totals, home_goals, away_goals = [], [], []
+    pearson = 0.0
+    pearson_df = 0
+    for match in matches:
+        if match["h"] not in model.teams or match["a"] not in model.teams:
+            continue
+        matrix = ratings.score_matrix(model, match["h"], match["a"])
+        lam_h, lam_a = ratings.lambdas(model, match["h"], match["a"])
+        pearson += (match["hg"] - lam_h) ** 2 / lam_h + (match["ag"] - lam_a) ** 2 / lam_a
+        pearson_df += 2
+        total = match["hg"] + match["ag"]
+        totals.append(total)
+        home_goals.append(match["hg"])
+        away_goals.append(match["ag"])
+        if total >= 8:
+            observed_tail += 1
+        else:
+            observed[total] += 1
+        for k, mask in enumerate(bins):
+            expected[k] += float(matrix[mask].sum())
+        expected_tail += float(matrix[tail].sum())
+
+    observed = observed + [observed_tail]
+    expected = expected + [expected_tail]
+    ratios = [round(obs / exp, 3) if exp > 0 else None for obs, exp in zip(observed, expected)]
+    pearson_df = max(pearson_df - (2 * len(model.teams) + 2), 1)
+    return {
+        "goals_gof": inference.chi_square_gof(observed, expected),
+        "goals_ratios": ratios,
+        "pearson_dispersion": {
+            "pearson": round(pearson, 2),
+            "df": pearson_df,
+            "ratio": round(pearson / pearson_df, 3),
+        },
+        "dispersion_total": inference.dispersion_index(totals),
+        "dispersion_home": inference.dispersion_index(home_goals),
+        "dispersion_away": inference.dispersion_index(away_goals),
+        "observed_total_goals": observed,
+        "expected_total_goals": [round(value, 2) for value in expected],
     }
 
 

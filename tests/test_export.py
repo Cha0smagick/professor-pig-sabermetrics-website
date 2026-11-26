@@ -32,7 +32,7 @@ def test_build_writes_valid_schema(tmp_path):
     for index, season in enumerate(("2021-22", "2022-23", "2023-24", "2024-25")):
         _season(raw, season, index)
 
-    result = export.build(raw, tmp_path / "cache.jsonl.gz", out, tmp_path / "aliases.json", extra=None)
+    result = export.build(raw, tmp_path / "cache.jsonl.gz", out, tmp_path / "aliases.json", extra=None, live=None)
 
     assert result["matches"] == 120
     leagues = json.loads((out / "leagues.json").read_text(encoding="utf-8"))
@@ -60,8 +60,8 @@ def test_build_is_deterministic(tmp_path):
 
     first = tmp_path / "first"
     second = tmp_path / "second"
-    export.build(raw, cache, first, tmp_path / "aliases.json", extra=None)
-    export.build(raw, cache, second, tmp_path / "aliases.json", extra=None)
+    export.build(raw, cache, first, tmp_path / "aliases.json", extra=None, live=None)
+    export.build(raw, cache, second, tmp_path / "aliases.json", extra=None, live=None)
 
     for name in ("leagues.json", "ratings.json"):
         one = json.loads((first / name).read_text(encoding="utf-8"))

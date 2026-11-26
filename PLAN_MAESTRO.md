@@ -15,7 +15,7 @@
 
 **No es**: un LLM que "adivina" partidos. No hay agentes conversacionales en runtime. No se predicen deportes sin datos. No se promete rentabilidad.
 
-**Deporte activo**: fútbol. Motivo medido: 87.460 partidos con marcador en 40 competiciones (92.900 registros, 4.932 sin marcador); **0 ficheros** de basketball/NFL/NHL/MLB/tenis en todo el repo (auditoría D). La arquitectura queda parametrizada por `sport` para añadir otros cuando existan datos; hoy inventar cifras sería mentir.
+**Deporte activo**: fútbol. Motivo medido: 87.224 partidos con marcador en 39 competiciones (92.900 registros, 4.932 sin marcador); **0 ficheros** de basketball/NFL/NHL/MLB/tenis en todo el repo (auditoría D). La arquitectura queda parametrizada por `sport` para añadir otros cuando existan datos; hoy inventar cifras sería mentir.
 
 ---
 
@@ -293,13 +293,71 @@ Resultado del prototipo (Premier League, 3.919 partidos fuera de muestra): **Bri
 
 **P10.1 — End-to-end desde cero.**
 - *Acción*: `pytest`, `build` con crudo y `build` solo con cache (sin `openfootball_data`), servir `site/`, predecir.
-- *Evidencia*: 32 tests verdes; build desde cache produce 87.460 partidos y las mismas métricas; CLI `predict` responde.
+- *Evidencia*: 48 tests verdes; build desde cache produce 87.224 partidos y las mismas métricas; CLI `predict` responde.
 - *Parada*: reproducible sin red.
 
 **P10.2 — Números finales.**
 - *Acción*: registrar métricas y cobertura en README y `metrics.json`.
-- *Evidencia*: Brier validado 0.6105 vs 0.6489; n=9.858; 21/24 ligas baten baseline.
+- *Evidencia*: Brier validado 0.6050 vs 0.6502; n=22.085; 20/23 ligas baten baseline con FDR 5%.
 - *Parada*: publicable.
+
+---
+
+### FASE 11 — Auditoría estadística, ML y seguridad (segunda ronda)
+
+**P11.1 — Inferencia con dependencia temporal.**
+- *Acción*: `inference.py`: bootstrap de bloques semanales, IC95%, p unilateral, BSS, ECE, descomposición de Brier y Benjamini-Hochberg.
+- *Evidencia*: `metrics.json` incluye `inference` por liga y agregado; 20/23 ligas con q≤0,05.
+- *Parada*: ninguna cifra de mejora sin IC y q.
+
+**P11.2 — Comparación honesta de modelos.**
+- *Acción*: benchmark a corte fijo con features pre-partido; DC vs XGBoost vs híbrido 50/50; peso fijado a priori.
+- *Evidencia*: n=9.591; DC 0.6215, XGB 0.6095, híbrido 0.6101; híbrido vs DC Δ=+0.0114 [0.0095–0.0134], p<0.001.
+- *Parada*: el modelo publicado es el híbrido y la web muestra la comparación.
+
+**P11.3 — Diagnóstico de supuestos.**
+- *Acción*: chi-cuadrado de goles, índice de dispersión, tendencia de Spearman, Wilson para local/empate/árbitros, correlación con IC y p.
+- *Evidencia*: `lab/*.json` incluye `diagnostics` y `trend`; la web los muestra con lectura práctica.
+- *Parada*: supuestos visibles, no ocultos.
+
+**P11.4 — Seguridad.**
+- *Acción*: CSP sin `unsafe-inline`, `referrer: no-referrer`, acciones por SHA, `persist-credentials: false`, `timeout`, `SECURITY.md`, `LICENSE`, Dependabot. Se eliminaron del árbol local las copias de claves y se desenlazó el remoto/rama antiguos.
+- *Evidencia*: `grep` de sinks XSS con `esc`; `hybrid.json` valida longitud; workflow endurecido.
+- *Parada*: sin secretos en el árbol nuevo; claves pendientes de rotación por el propietario.
+
+**P11.5 — Comunicación científica.**
+- *Acción*: el Modelo muestra IC, p, q, BSS, ECE, descomposición y comparación de modelos; el Laboratorio muestra diagnósticos y CIs; los límites están escritos.
+- *Evidencia*: revisión en navegador de las cuatro pestañas.
+- *Parada*: cada cifra tiene n, fuente o incertidumbre.
+
+---
+
+### FASE 12 — Actualización diaria y fuentes multi-deporte
+
+**P12.1 — Catálogo de fuentes gratuitas.**
+- *Acción*: `sources.py` con 23 fuentes (openfootball, TheSportsDB, OpenLigaDB, MLB, NHL, nflverse, football-data.org, API-Football, FBref, Understat, StatsBomb, NBA, BallDontLie, ESPN, Retrosheet, Lahman, Sackmann, The Odds API, Kaggle, Wikidata, Hugging Face, BigQuery).
+- *Evidencia*: `site/data/sources.json`; 6 cableadas.
+- *Parada*: cada fuente tiene auth, frecuencia, licencia y estado.
+
+**P12.2 — Actualizador diario.**
+- *Acción*: `live.py` descarga el día anterior de openfootball, OpenLigaDB, TheSportsDB, MLB StatsAPI, NHL API y nflverse; normaliza y deduplica en `data/live_matches.jsonl` y `data/live_events.jsonl`.
+- *Evidencia*: ejecución real para 2026-11-23/24: 4 partidos de fútbol nuevos, 35 eventos, 0 errores.
+- *Parada*: fallos de red aislados; el build no se rompe.
+
+**P12.3 — Workflows.**
+- *Acción*: `daily.yml` a las 11:00 UTC (06:00 Bogotá) commitea solo los dos JSONL; `pages.yml` reconstruye con Python y publica en Pages en cada push.
+- *Evidencia*: YAML válido; permisos mínimos; sin secretos.
+- *Parada*: si no hay resultados nuevos, no hay commit ni deploy.
+
+**P12.4 — Datos multi-deporte en la web.**
+- *Acción*: pestaña Datos con última actualización, fuentes, eventos recientes, cobertura por deporte y estado del modelo.
+- *Evidencia*: 8 partidos y 66 eventos visibles; 5 deportes con datos.
+- *Parada*: se distingue dato de predicción; no se inventan probabilidades para deportes sin modelo.
+
+**P12.5 — Límite explícito.**
+- *Acción*: solo fútbol tiene modelo; NHL/MLB/NFL/baloncesto/tenis tienen datos diarios pero no histórico/modelo validado.
+- *Evidencia*: texto en la web y README.
+- *Parada*: honestidad mantenida.
 
 ---
 
@@ -307,9 +365,9 @@ Resultado del prototipo (Premier League, 3.919 partidos fuera de muestra): **Bri
 
 1. Cero secretos en el índice de git.
 2. `python -m sabermetria build` reproducible: mismos JSON (salvo timestamp) en dos ejecuciones.
-3. Backtest walk-forward real: el modelo supera el baseline de frecuencia en Brier y log-loss en ≥80% de las ligas con ≥200 partidos de test. **Resultado: 21/24 = 87,5%.**
+3. Backtest walk-forward real: el modelo supera el baseline de frecuencia en Brier y log-loss en ≥80% de las ligas con ≥200 partidos de test. **Resultado: 20/23 = 87,0% con FDR 5%.**
 4. Web funciona 100% offline; ninguna petición de red salvo cargar sus propios JSON.
-5. `pytest` ≥20 tests, 0 fallos. **Resultado: 40 tests.**
+5. `pytest` ≥20 tests, 0 fallos. **Resultado: 48 tests.**
 6. Toda cifra mostrada en la web tiene origen en `metrics.json`, `lab/*.json` o en el cálculo explícito del navegador.
 7. Deportes sin datos no aparecen como si tuvieran modelo.
 8. El laboratorio no inventa señales ausentes (xG, jugadores, minutos): las declara como no disponibles.
@@ -335,18 +393,18 @@ Resultado del prototipo (Premier League, 3.919 partidos fuera de muestra): **Bri
 |------|------|--------|-----------|
 | 0 | P0.1 | [x] | `config/` ignorado; claves fuera del índice; README advierte rotación |
 | 0 | P0.2 | [x] | `requirements.txt`, `pyproject.toml`, import limpio |
-| 1 | P1.1 | [x] | 87.460 partidos normalizados, 4.932 sin marcador descartados |
-| 1 | P1.2 | [x] | 40 ligas con estado; 21 validadas |
+| 1 | P1.1 | [x] | 87.224 partidos normalizados, 4.932 sin marcador descartados |
+| 1 | P1.2 | [x] | 39 ligas con estado; 20 validadas |
 | 2 | P2.1 | [x] | matriz estocástica, simetría, reproducibilidad (tests) |
 | 2 | P2.2 | [x] | hiperparámetros por liga en `leagues.json` |
 | 2 | P2.3 | [x] | Elo exportado como referencia; no mejora el 1X2 y no se usa como motor |
-| 3 | P3.1 | [x] | Brier 0.6176 vs 0.6489 (n=11.844) |
+| 3 | P3.1 | [x] | Brier 0.6126 vs 0.6512 (n=26.838) |
 | 3 | P3.2 | [x] | test de no-fuga + walk-forward |
 | 4 | P4.1 | [x] | 3 JSON base + 41 ficheros de laboratorio |
 | 5 | P5.1 | [x] | Predecir, Laboratorio, Datos, Modelo funcionando en navegador |
 | 5 | P5.2 | [x] | fecha de datos, límites y "no es consejo" visibles |
 | 5 | P5.3 | [x] | `.github/workflows/pages.yml` + README |
-| 6 | P6.1 | [x] | 40 tests verdes |
+| 6 | P6.1 | [x] | 48 tests verdes |
 | 6 | P6.2 | [x] | casos límite: equipos sin historial, rho extremo, ligas cortas |
 | 7 | P7.1 | [x] | legado en `legacy/`; build no lo referencia |
 | 7 | P7.2 | [x] | README reproducible |
@@ -359,4 +417,14 @@ Resultado del prototipo (Premier League, 3.919 partidos fuera de muestra): **Bri
 | 9 | P9.2 | [x] | secretos ignorados y advertidos |
 | 9 | P9.3 | [x] | raíz limpia; tests verdes tras archivar |
 | 10 | P10.1 | [x] | build desde cache sin `openfootball_data`; CLI `predict` OK |
-| 10 | P10.2 | [x] | Brier validado 0.6105; 21/24 ligas |
+| 10 | P10.2 | [x] | Brier validado 0.6050; 20/23 ligas |
+| 11 | P11.1 | [x] | bootstrap de bloques, IC, p, q, BSS, ECE |
+| 11 | P11.2 | [x] | XGBoost e híbrido 50/50 comparados fuera de muestra |
+| 11 | P11.3 | [x] | GOF, dispersión, tendencia, Wilson en laboratorio |
+| 11 | P11.4 | [x] | CSP, SHA, SECURITY, claves locales eliminadas |
+| 11 | P11.5 | [x] | web con IC, p, q, BSS y límites |
+| 12 | P12.1 | [x] | 23 fuentes catalogadas; 6 cableadas |
+| 12 | P12.2 | [x] | update real: 4 partidos y 35 eventos (2026-11-23/24) |
+| 12 | P12.3 | [x] | daily 11:00 UTC + Pages build/deploy |
+| 12 | P12.4 | [x] | Datos: live, fuentes, eventos, otros deportes |
+| 12 | P12.5 | [x] | solo fútbol con modelo; resto sin probabilidades |

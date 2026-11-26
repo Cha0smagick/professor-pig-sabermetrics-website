@@ -34,7 +34,6 @@ LEAGUES = {
     "fr.2": ("Francia", "Ligue 2", 34),
     "at.2": ("Austria", "Erste Liga", 35),
     "ch.2": ("Suiza", "Challenge League", 36),
-    "ru.2": ("Rusia", "FNL", 37),
     "tr.2": ("Turquía", "1. Lig", 38),
     "en.3": ("Inglaterra", "League One", 40),
     "en.4": ("Inglaterra", "League Two", 41),
@@ -59,6 +58,7 @@ LEAGUES = {
 EXCLUDED = {
     "at.cup": "copa nacional (eliminatorias)",
     "de.cup": "copa nacional (eliminatorias)",
+    "ru.2": "duplicado exacto de ru.1 (2019-20)",
     "copa.l": "copa continental (eliminatorias)",
     "uefa.cl": "copa continental (eliminatorias)",
 }

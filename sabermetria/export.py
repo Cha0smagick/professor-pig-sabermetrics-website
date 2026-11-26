@@ -6,7 +6,7 @@ import json
 from datetime import datetime, timezone
 from pathlib import Path
 
-from . import backtest, ingest, ratings, stats
+from . import backtest, benchmark, ingest, live as live_module, ratings, sources, stats
 from .leagues import LEAGUES, SPORTS
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -32,8 +32,9 @@ def build(
     out_dir: Path = OUT_DIR,
     aliases: Path | None = None,
     extra: Path | None = ingest.DEFAULT_EXTRA,
+    live: Path | None = ingest.DEFAULT_LIVE,
 ) -> dict:
-    matches, rejected = ingest.ingest(raw, cache, aliases or ingest.DEFAULT_ALIASES, extra)
+    matches, rejected = ingest.ingest(raw, cache, aliases or ingest.DEFAULT_ALIASES, extra, live)
     if not matches:
         raise RuntimeError("No hay partidos normalizados: revisa la fuente de datos")
 
@@ -52,8 +53,12 @@ def build(
         except ValueError as error:
             print(f"  [{code}] omitida: {error}", flush=True)
 
-    metrics = backtest.aggregate(results, min_n=200)
-    metrics_validated = backtest.aggregate(results, min_n=200, only_validated=True)
+    print("  evaluando hibrido DC + XGBoost...", flush=True)
+    hybrid_results, benchmark_info, hybrid_artifact = benchmark.evaluate_hybrid(matches, results)
+    public_results = hybrid_results if benchmark_info.get("available") else results
+
+    metrics = backtest.aggregate(public_results, min_n=200)
+    metrics_validated = backtest.aggregate(public_results, min_n=200, only_validated=True)
     summary = ingest.summarize(matches)
     data_through = max(match["d"] for match in matches)
     generated = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
@@ -63,6 +68,7 @@ def build(
         country, name, priority = LEAGUES[code]
         info = summary[code]
         model = result.model
+        league_metrics = metrics["leagues"].get(code, {})
         leagues_json.append(
             {
                 "code": code,
@@ -76,7 +82,7 @@ def build(
                 "first": info["first"],
                 "last": info["last"],
                 "coverage": _round(result.coverage),
-                "validated": metrics["leagues"][code]["validated"],
+                "validated": bool(league_metrics.get("validated")),
                 "tuning": {"half_life": model.half_life, "l2": model.l2, "alpha": model.extra.get("alpha", 0.0)},
             }
         )
@@ -107,6 +113,33 @@ def build(
         for code, result in results.items()
     }
 
+    for code, dc_result in results.items():
+        entry = metrics["leagues"].get(code)
+        if not entry:
+            metrics["leagues"][code] = {
+                "status": dc_result.status,
+                "n": dc_result.metrics.get("n") or 0,
+                "brier": dc_result.metrics.get("brier"),
+                "logloss": dc_result.metrics.get("logloss"),
+                "accuracy": dc_result.metrics.get("accuracy"),
+                "base_brier": dc_result.baseline.get("brier"),
+                "base_logloss": dc_result.baseline.get("logloss"),
+                "base_accuracy": dc_result.baseline.get("accuracy"),
+                "coverage": round(dc_result.coverage, 4),
+                "improved": False,
+                "p_value": dc_result.inference.get("p_value"),
+                "q_value": None,
+                "validated": False,
+                "inference": dc_result.inference,
+            }
+            entry = metrics["leagues"][code]
+        entry["dc_brier"] = _round(dc_result.metrics.get("brier"), 5)
+        entry["dc_p_value"] = dc_result.inference.get("p_value")
+        entry["dc_improved"] = bool(
+            dc_result.metrics.get("brier") is not None
+            and dc_result.metrics["brier"] < (dc_result.baseline.get("brier") or 1e9)
+        )
+
     metrics_json = {
         "sport": "football",
         "generated_at": generated,
@@ -117,8 +150,10 @@ def build(
         "aggregate_validated": {k: v for k, v in metrics_validated.items() if k != "leagues"},
         "min_evaluation_n": 200,
         "leagues": metrics["leagues"],
+        "benchmark": benchmark_info,
         "model": {
-            "name": "Dixon-Coles con decaimiento temporal",
+            "name": "Híbrido Dixon-Coles + XGBoost" if benchmark_info.get("available") else "Dixon-Coles con decaimiento temporal",
+            "weights": benchmark_info.get("weights"),
             "target": SPORTS["football"]["score_unit"],
             "hyperparameters": "elegidos por liga con holdout walk-forward",
         },
@@ -169,6 +204,7 @@ def build(
             "country": country,
             "name": name,
             "data_through": max(row["d"] for row in matches if row["l"] == code),
+            "diagnostics": stats.model_diagnostics(results[code].model, groups[code]),
             **payload,
         }
         (lab_dir / f"{code}.json").write_text(
@@ -181,7 +217,15 @@ def build(
         "leagues.json": sorted(leagues_json, key=lambda item: item["priority"]),
         "ratings.json": ratings_json,
         "metrics.json": metrics_json,
+        "sources.json": {"generated_at": generated, "sources": sources.CATALOG},
+        "live.json": {
+            "generated_at": generated,
+            "summary": live_module.summary(),
+            "sources": sources.CATALOG,
+        },
     }
+    if hybrid_artifact:
+        files["hybrid.json"] = hybrid_artifact
     for filename, payload in files.items():
         path = out_dir / filename
         path.write_text(json.dumps(payload, ensure_ascii=False, separators=(",", ":")), encoding="utf-8")

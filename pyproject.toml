@@ -7,7 +7,7 @@ name = "sabermetria"
 version = "1.0.0"
 description = "Motor predictivo de futbol basado en Dixon-Coles con validacion walk-forward"
 requires-python = ">=3.10"
-dependencies = ["numpy>=2.0,<3", "scipy>=1.11,<2", "pandas>=2.0,<3"]
+dependencies = ["numpy>=2.0,<3", "scipy>=1.11,<2", "pandas>=2.0,<3", "xgboost>=2.0,<4"]
 
 [project.optional-dependencies]
 dev = ["pytest>=8.0"]

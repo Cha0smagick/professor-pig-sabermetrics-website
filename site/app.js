@@ -1,7 +1,7 @@
 /* Sabermetría — laboratorio y predicción, cálculo íntegro en el navegador. */
 "use strict";
 
-const MAXG = 10;
+const MAXG = 15;
 const LOGFACT = [0];
 for (let i = 1; i <= MAXG; i++) LOGFACT[i] = LOGFACT[i - 1] + Math.log(i);
 
@@ -10,6 +10,9 @@ const pct = (value, digits = 1) => `${(value * 100).toFixed(digits)}%`;
 const num = (value, digits = 2) => Number(value).toFixed(digits);
 const esc = (text) => String(text).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 const signed = (value, digits = 2) => `${value > 0 ? "+" : ""}${Number(value).toFixed(digits)}`;
+const fmtP = (value) => value === null || value === undefined ? "—" : Number(value) < 0.001 ? "<0.001" : Number(value).toFixed(3);
+const fmtCI = (ci, digits = 3) => ci ? `${Number(ci[0]).toFixed(digits)}–${Number(ci[1]).toFixed(digits)}` : "—";
+const fmtPctCI = (ci) => ci ? `${pct(ci[0], 0)}–${pct(ci[1], 0)}` : "—";
 const state = {
   league: null,
   home: null,
@@ -26,7 +29,7 @@ const state = {
   team: null,
   rival: null,
 };
-const DATA = { leagues: [], ratings: null, metrics: null, labIndex: null };
+const DATA = { leagues: [], ratings: null, metrics: null, labIndex: null, hybrid: null, live: null, sources: null };
 
 /* ---------- matemática del modelo ---------- */
 const poisson = (k, lam) => Math.exp(-lam + k * Math.log(lam) - LOGFACT[k]);
@@ -87,6 +90,11 @@ function blendMatrix(matrix, league) {
   const base = { home: league.base[0], draw: league.base[1], away: league.base[2] };
   const target = {};
   for (const key of ["home", "draw", "away"]) target[key] = (1 - alpha) * current[key] + alpha * base[key];
+  return calibrateMatrix(matrix, target);
+}
+
+function calibrateMatrix(matrix, target) {
+  const current = outcomeProbs(matrix);
   const factor = {
     home: current.home > 1e-9 ? target.home / current.home : 1,
     draw: current.draw > 1e-9 ? target.draw / current.draw : 1,
@@ -94,6 +102,24 @@ function blendMatrix(matrix, league) {
   };
   const scaled = matrix.map((row, x) => row.map((value, y) => value * (x > y ? factor.home : x === y ? factor.draw : factor.away)));
   return normalizeMatrix(scaled);
+}
+
+function hybridProbs(code, home, away) {
+  const hybrid = DATA.hybrid;
+  if (!hybrid) return null;
+  if (hybrid.generated_at && DATA.metrics && hybrid.generated_at < DATA.metrics.data_through) return null;
+  const league = hybrid.leagues[code];
+  if (!league) return null;
+  if (!Array.isArray(league.teams) || league.teams.length !== league.n) return null;
+  if (!Array.isArray(league.pairs) || league.pairs.length !== league.n * league.n * 3) return null;
+  const hi = league.teams.indexOf(home);
+  const ai = league.teams.indexOf(away);
+  if (hi < 0 || ai < 0) return null;
+  const index = (hi * league.n + ai) * 3;
+  const values = [league.pairs[index], league.pairs[index + 1], league.pairs[index + 2]].map((value) => value / 1000);
+  const total = values[0] + values[1] + values[2];
+  if (!(total > 0)) return null;
+  return { home: values[0] / total, draw: values[1] / total, away: values[2] / total };
 }
 
 function markets(matrix) {
@@ -141,7 +167,12 @@ function valueRows(probs, odds) {
 const leagueByCode = (code) => DATA.ratings.leagues[code];
 const metaByCode = (code) => DATA.leagues.find((item) => item.code === code);
 const labMetaByCode = (code) => DATA.labIndex.leagues.find((item) => item.code === code);
-const playableLeagues = () => DATA.leagues.filter((item) => item.validated && leagueByCode(item.code) && item.teams >= 8);
+const playableLeagues = () => {
+  const latest = DATA.ratings.data_through;
+  const cutoff = new Date(latest);
+  cutoff.setDate(cutoff.getDate() - 450);
+  return DATA.leagues.filter((item) => item.validated && leagueByCode(item.code) && item.teams >= 8 && item.last && new Date(item.last) >= cutoff);
+};
 
 function sortedTeams(code) {
   return leagueByCode(code).teams.slice().sort((a, b) => a[0].localeCompare(b[0], "es"));
@@ -265,10 +296,12 @@ function renderPrediction() {
   if (!state.league || !state.home || !state.away) {
     empty.hidden = false; result.hidden = true; return;
   }
-  let matrix, stats;
+  let matrix, stats, xgb;
   try {
     const league = leagueByCode(state.league);
-    matrix = blendMatrix(rawMatrix(league, state.home, state.away, state.neutral), league);
+    const dc = rawMatrix(league, state.home, state.away, state.neutral);
+    xgb = state.neutral ? null : hybridProbs(state.league, state.home, state.away);
+    matrix = xgb ? calibrateMatrix(dc, xgb) : blendMatrix(dc, league);
     stats = markets(matrix);
   } catch (error) {
     empty.hidden = false; result.hidden = true;
@@ -280,7 +313,8 @@ function renderPrediction() {
   const meta = metaByCode(state.league);
   const league = leagueByCode(state.league);
   $("matchTitle").textContent = `${state.home} vs ${state.away}`;
-  $("leagueTag").textContent = `${meta.country} · ${meta.name}${state.neutral ? " · sede neutral" : ""}`;
+  const mode = state.neutral ? "sede neutral · Dixon-Coles" : (xgb ? "híbrido DC+XGB 50/50" : "Dixon-Coles");
+  $("leagueTag").textContent = `${meta.country} · ${meta.name} · ${mode}`;
 
   const probs = stats.probs;
   $("outcomes").innerHTML = [["Local", probs.home, "home"], ["Empate", probs.draw, "draw"], ["Visitante", probs.away, "away"]]
@@ -288,8 +322,9 @@ function renderPrediction() {
       <div class="outcome ${key}">
         <span class="label">${label}</span>
         <strong>${pct(value)}</strong>
-        <div class="bar"><i style="width:${(value * 100).toFixed(1)}%"></i></div>
+        <div class="bar"><i data-width="${(value * 100).toFixed(1)}"></i></div>
       </div>`).join("");
+  document.querySelectorAll("#outcomes .bar i").forEach((bar) => { bar.style.width = `${bar.dataset.width}%`; });
 
   $("xg").textContent = `${num(stats.goalsHome)} — ${num(stats.goalsAway)}`;
   $("confidence").textContent = `${(stats.margin * 100).toFixed(1)} pts`;
@@ -304,7 +339,8 @@ function renderPrediction() {
   $("ouBody").innerHTML = Object.entries(stats.over).map(([line, value]) => `<tr><td>${line}</td><td>${pct(value)}</td><td>${pct(1 - value)}</td><td>${num(1 / value)}</td></tr>`).join("");
   $("ahBody").innerHTML = ["-1", "-0.5", "0.5", "1"].map((line) => {
     const h = stats.handicap[line];
-    return `<tr><td>${Number(line) > 0 ? "+" : ""}${line}</td><td>${pct(h.win)}</td><td>${pct(h.push)}</td><td>${pct(h.lose)}</td><td>${h.win > 0 ? num(1 / h.win) : "—"}</td></tr>`;
+    const fair = h.win > 0 ? (1 - h.push) / h.win : null;
+    return `<tr><td>${Number(line) > 0 ? "+" : ""}${line}</td><td>${pct(h.win)}</td><td>${pct(h.push)}</td><td>${pct(h.lose)}</td><td>${fair ? num(fair) : "—"}</td></tr>`;
   }).join("");
 
   renderValue(probs);
@@ -353,7 +389,7 @@ function renderContext() {
   const formRow = (team) => `
     <div class="ctx-team">
       <div><strong>${esc(team.name)}</strong><span class="note">${team.m} PJ · ${team.pts} pts · Elo ${team.elo}</span></div>
-      <div class="form">${team.form.split("").map((r) => `<i class="${r}">${r}</i>`).join("") || "—"}</div>
+      <div class="form">${team.form.split("").map((r) => `<i class="${esc(r)}">${esc(r)}</i>`).join("") || "—"}</div>
       <div class="ctx-metrics">
         <span>Local ${team.home.pts} pts</span>
         <span>Visitante ${team.away.pts} pts</span>
@@ -363,7 +399,7 @@ function renderContext() {
       </div>
     </div>`;
   const record = h2h(lab, state.home, state.away, 4);
-  const rows = record.rows.map((r) => `<li><span class="h2h-date">${r.date}</span><span>${esc(r.home)}</span><b>${r.hg}–${r.ag}</b><span>${esc(r.away)}</span></li>`).join("");
+  const rows = record.rows.map((r) => `<li><span class="h2h-date">${esc(r.date)}</span><span>${esc(r.home)}</span><b>${r.hg}–${r.ag}</b><span>${esc(r.away)}</span></li>`).join("");
   $("contextBody").innerHTML = `
     <div>
       <h3>Forma y perfil</h3>
@@ -383,16 +419,16 @@ function scopedTotals(lab) { return state.labScope === "recent" && lab.recent ? 
 function renderLabKpis(lab) {
   const t = scopedTotals(lab);
   const items = [
-    ["Partidos", t.matches],
-    ["Goles por partido", t.avg_goals],
-    ["Victoria local", pct(t.home_win)],
-    ["Empate", pct(t.draw)],
-    ["Victoria visitante", pct(t.away_win)],
-    ["Over 2.5", pct(t.over25)],
-    ["Ambos marcan", pct(t.btts)],
-    ["Remontadas", pct(t.comeback_rate)],
+    ["Partidos", t.matches, ""],
+    ["Goles por partido", t.avg_goals, ""],
+    ["Victoria local", pct(t.home_win), `IC95 ${fmtPctCI(t.home_win_ci)}`],
+    ["Empate", pct(t.draw), `IC95 ${fmtPctCI(t.draw_ci)}`],
+    ["Victoria visitante", pct(t.away_win), ""],
+    ["Over 2.5", pct(t.over25), ""],
+    ["Ambos marcan", pct(t.btts), ""],
+    ["Remontadas", pct(t.comeback_rate), ""],
   ];
-  $("labKpis").innerHTML = items.map(([label, value]) => `<div class="card metric"><span class="k">${label}</span><strong>${value}</strong></div>`).join("");
+  $("labKpis").innerHTML = items.map(([label, value, note]) => `<div class="card metric"><span class="k">${label}</span><strong>${value}</strong>${note ? `<span class="note">${note}</span>` : ""}</div>`).join("");
   $("labScopeNote").textContent = state.labScope === "recent" && lab.recent
     ? `Vista: temporada ${lab.recent.season} · ${t.matches} partidos.`
     : `Vista: histórico completo · ${t.matches} partidos.`;
@@ -419,7 +455,7 @@ function renderSeasonChart(lab) {
     if (i % every !== 0 && i !== seasons.length - 1) return "";
     const x = padL + i * bw + bw / 2;
     const short = s.season.includes("-") ? s.season.slice(2).replace("-", "–") : s.season.slice(2);
-    return `<text x="${x}" y="${h - padB + 14}" class="tick" text-anchor="middle">${short}</text>`;
+    return `<text x="${x}" y="${h - padB + 14}" class="tick" text-anchor="middle">${esc(short)}</text>`;
   }).join("");
   $("seasonChart").innerHTML = `
     <svg viewBox="0 0 ${w} ${h}" role="img" aria-label="Reparto de resultados por temporada">
@@ -451,14 +487,20 @@ function renderGoalsChart(lab) {
 
 function renderSeasonTable(lab) {
   $("seasonBody").innerHTML = lab.seasons.map((s) => `<tr>
-    <td>${s.season}</td><td>${s.matches}</td><td>${num(s.avg_goals, 2)}</td>
+    <td>${esc(s.season)}</td><td>${s.matches}</td><td>${num(s.avg_goals, 2)}</td>
     <td>${pct(s.home_win)}</td><td>${pct(s.draw)}</td><td>${pct(s.away_win)}</td>
     <td>${pct(s.over25)}</td><td>${pct(s.btts)}</td>
     <td>${num(s.avg_goals_1h, 2)}</td><td>${num(s.avg_goals_2h, 2)}</td>
   </tr>`).join("");
+  const trend = lab.trend ? lab.trend.avg_goals : null;
+  $("trendNote").textContent = trend && trend.rho !== null
+    ? `Tendencia de goles por temporada: Spearman ρ = ${trend.rho}, p = ${fmtP(trend.p)} (${trend.n} temporadas). No implica causalidad.`
+    : "Sin temporadas suficientes para estimar tendencia.";
   const t = lab.totals;
   $("timeStats").innerHTML = [
-    ["Cobertura medio tiempo", pct(t.ht_coverage)],
+    ["Cobertura ht (observada)", pct(t.ht_observed_coverage)],
+    ["Cobertura ht (con 0-0 imputado)", pct(t.ht_coverage)],
+    ["0-0 imputados", t.ht_imputed ?? 0],
     ["Empate al descanso", pct(t.ht_draw)],
     ["Over 0.5 al descanso", pct(t.ht_over05)],
     ["Goles 1ª parte", num(t.avg_goals_1h, 2)],
@@ -499,7 +541,7 @@ function renderLabTeams(lab) {
       <td><strong>${team.pts}</strong></td><td>${num(team.ppg, 2)}</td>
       <td>${pct(team.over25_rate)}</td><td>${pct(team.btts_rate)}</td>
       <td>${team.elo}</td><td class="${team.luck >= 0 ? "pos" : "neg"}">${signed(team.luck, 1)}</td>
-      <td><span class="form">${team.form.split("").map((r) => `<i class="${r}">${r}</i>`).join("")}</span></td>
+      <td><span class="form">${team.form.split("").map((r) => `<i class="${esc(r)}">${esc(r)}</i>`).join("")}</span></td>
     </tr>`).join("") || `<tr><td colspan="16" class="muted">Sin resultados</td></tr>`;
 }
 
@@ -511,17 +553,17 @@ function renderTeamDetail(lab, name) {
   const rivals = scoped.filter((t) => t.name !== name);
   if (!state.rival || !rivals.some((r) => r.name === state.rival)) state.rival = rivals[0]?.name;
   const record = state.rival ? h2h(lab, name, state.rival, 8) : { rows: [], w: 0, d: 0, l: 0, gf: 0, ga: 0, n: 0 };
-  const rows = record.rows.map((r) => `<li><span class="h2h-date">${r.date}</span><span>${esc(r.home)}</span><b>${r.hg}–${r.ag}</b><span>${esc(r.away)}</span></li>`).join("");
+  const rows = record.rows.map((r) => `<li><span class="h2h-date">${esc(r.date)}</span><span>${esc(r.home)}</span><b>${r.hg}–${r.ag}</b><span>${esc(r.away)}</span></li>`).join("");
   const inScope = scoped.some((t) => t.name === name);
   const scopeLabel = inScope && state.labScope === "recent" && lab.recent ? `Temporada ${lab.recent.season}` : "Histórico completo";
   card.hidden = false;
   card.innerHTML = `
-    <div class="card-head"><h2>${esc(team.name)}</h2><span class="tag">${scopeLabel} · Elo ${team.elo} · ${team.m} PJ</span></div>
+    <div class="card-head"><h2>${esc(team.name)}</h2><span class="tag">${esc(scopeLabel)} · Elo ${team.elo} · ${team.m} PJ</span></div>
     <div class="grid four">
       <div class="metric"><span class="k">Puntos</span><strong>${team.pts}</strong><span class="note">${num(team.ppg, 2)} por partido</span></div>
       <div class="metric"><span class="k">Goles</span><strong>${team.gf}–${team.ga}</strong><span class="note">DG ${signed(team.gd, 0)}</span></div>
       <div class="metric"><span class="k">Pythagorean</span><strong>${num(team.pyth, 1)}</strong><span class="note">Suerte ${signed(team.luck, 1)} pts</span></div>
-      <div class="metric"><span class="k">Forma</span><strong>${team.streak || "—"}</strong><span class="note">${team.form || "sin partidos"}</span></div>
+      <div class="metric"><span class="k">Forma</span><strong>${esc(team.streak || "—")}</strong><span class="note">${esc(team.form || "sin partidos")}</span></div>
     </div>
     <div class="grid two">
       <div>
@@ -561,8 +603,35 @@ function renderReferees(lab) {
   card.hidden = false;
   $("refBody").innerHTML = lab.referees.map((ref) => `<tr>
     <td>${esc(ref.name)}</td><td>${ref.matches}</td><td>${num(ref.avg_goals, 2)}</td>
-    <td>${pct(ref.home_win)}</td><td>${pct(ref.draw)}</td><td>${pct(ref.over25)}</td>
+    <td>${pct(ref.home_win)} <span class="note">[${fmtPctCI(ref.home_win_ci)}]</span></td>
+    <td>${pct(ref.draw)}</td>
+    <td>${pct(ref.over25)} <span class="note">[${fmtPctCI(ref.over25_ci)}]</span></td>
   </tr>`).join("");
+}
+
+function renderDiagnostics(lab) {
+  const diagnostics = lab.diagnostics;
+  if (!diagnostics) {
+    $("diagTag").textContent = "sin datos";
+    $("diagnostics").innerHTML = `<p class="note">No hay diagnóstico disponible.</p>`;
+    return;
+  }
+  const gof = diagnostics.goals_gof || {};
+  const pearson = diagnostics.pearson_dispersion || {};
+  const ratios = diagnostics.goals_ratios || [];
+  const dispersion = diagnostics.dispersion_total || {};
+  $("diagTag").textContent = "descriptivo";
+  $("diagTag").className = "tag";
+  $("diagnostics").innerHTML = [
+    ["Chi-cuadrado", gof.chi2 ?? "—"],
+    ["Grados de libertad", gof.df ?? "—"],
+    ["p (no ajustada por parámetros)", fmtP(gof.p)],
+    ["Dispersión Pearson", pearson.ratio ?? "—"],
+    ["1 gol: observado/esperado", ratios[1] ?? "—"],
+    ["8+ goles: observado/esperado", ratios[8] ?? "—"],
+    ["Varianza / media", dispersion.index ?? "—"],
+    ["Media de goles", dispersion.mean ?? "—"],
+  ].map(([k, v]) => `<div><span>${k}</span><strong>${v}</strong></div>`).join("");
 }
 
 function renderLab(lab) {
@@ -575,6 +644,7 @@ function renderLab(lab) {
   renderSeasonTable(lab);
   renderLabTeams(lab);
   renderReferees(lab);
+  renderDiagnostics(lab);
   if (state.team && scopedTeams(lab).some((t) => t.name === state.team)) renderTeamDetail(lab, state.team);
   else if (state.team && lab.teams.some((t) => t.name === state.team)) renderTeamDetail(lab, state.team);
   else { state.team = null; $("teamDetail").hidden = true; }
@@ -592,7 +662,7 @@ async function setLabLeague(code) {
     renderLab(lab);
   } catch (error) {
     $("labTag").textContent = "error";
-    $("labKpis").innerHTML = `<p class="note">No se pudo cargar ${code}: ${error.message}</p>`;
+    $("labKpis").innerHTML = `<p class="note">No se pudo cargar ${esc(code)}: ${esc(error.message)}</p>`;
   }
 }
 
@@ -637,12 +707,55 @@ function setupLab() {
 /* ---------- datos ---------- */
 function renderData() {
   const index = DATA.labIndex;
-  $("sportsGrid").innerHTML = index.sports.map((sport) => `
-    <div class="card metric">
+  const live = DATA.live;
+  const summary = (live && live.summary) || {};
+  const liveSports = summary.sports || {};
+  $("sportsGrid").innerHTML = index.sports.map((sport) => {
+    const count = liveSports[String(sport.name).toLowerCase()] || 0;
+    const active = sport.status === "active";
+    return `<div class="card metric">
       <span class="k">${esc(sport.name)}</span>
-      <strong class="${sport.status === "active" ? "pos" : "muted"}">${sport.status === "active" ? "activo" : "sin datos"}</strong>
-      <span class="note">${esc(sport.reason)}</span>
-    </div>`).join("");
+      <strong class="${active ? "pos" : count ? "warn" : "muted"}">${active ? "activo" : count ? "datos diarios" : "sin datos"}</strong>
+      <span class="note">${active ? esc(sport.reason) : count ? `${count} eventos descargados; modelo pendiente` : esc(sport.reason)}</span>
+    </div>`;
+  }).join("");
+
+  $("liveTag").textContent = live && live.generated_at ? `actualizado ${live.generated_at}` : "sin actualización";
+  $("liveSummary").innerHTML = [
+    ["Partidos de fútbol en vivo", summary.matches ?? 0],
+    ["Eventos de otros deportes", summary.events ?? 0],
+    ["Último partido", summary.last_match_date ?? "—"],
+    ["Último evento", summary.last_event_date ?? "—"],
+    ["Fuentes usadas", Object.keys(summary.sources || {}).length],
+    ["Deportes con datos", Object.keys(liveSports).length],
+  ].map(([label, value]) => `<div><span>${label}</span><strong>${value}</strong></div>`).join("");
+
+  const other = index.sports.filter((sport) => sport.status !== "active");
+  $("otherSports").innerHTML = other.map((sport) => {
+    const count = liveSports[String(sport.name).toLowerCase()] || 0;
+    return `<div><span>${esc(sport.name)}</span><strong class="${count ? "pos" : "muted"}">${count ? `${count} eventos` : "sin datos"}</strong></div>`;
+  }).join("");
+
+  const catalog = (DATA.sources && DATA.sources.sources) || (live && live.sources) || [];
+  $("sourcesCount").textContent = `${catalog.length} fuentes catalogadas`;
+  $("sourcesBody").innerHTML = catalog.map((source) => {
+    const status = source.status === "wired" ? ["cableada", "ok"] : source.status === "available" ? ["disponible", "warn"] : ["manual", ""];
+    return `<tr>
+      <td><a href="${esc(source.url)}" target="_blank" rel="noopener noreferrer">${esc(source.name)}</a></td>
+      <td>${esc((source.sports || []).join(", "))}</td>
+      <td>${esc(source.auth)}</td>
+      <td>${esc(source.cadence)}</td>
+      <td>${esc(source.license)}</td>
+      <td><span class="tag ${status[1]}">${status[0]}</span></td>
+    </tr>`;
+  }).join("");
+
+  const latest = summary.latest || [];
+  $("liveEvents").innerHTML = latest.map((row) => `<tr>
+    <td>${esc(row.date)}</td><td>${esc(row.sport)}</td><td>${esc(row.league)}</td>
+    <td>${esc(row.home)}</td><td>${esc(row.away)}</td>
+    <td>${row.hg ?? "—"}–${row.ag ?? "—"}</td><td>${esc(row.source)}</td>
+  </tr>`).join("") || `<tr><td colspan="7" class="muted">Sin eventos descargados todavía.</td></tr>`;
 
   const t = index.totals;
   $("dataKpis").innerHTML = [
@@ -661,13 +774,13 @@ function renderData() {
     return `<tr>
       <td>${esc(league.country)} · ${esc(league.name)}</td>
       <td>${status}</td><td>${league.seasons}</td><td>${league.matches}</td><td>${league.teams}</td>
-      <td>${league.first}</td><td>${league.last}</td><td>${pct(league.ht_coverage)}</td>
+      <td>${esc(league.first)}</td><td>${esc(league.last)}</td><td>${pct(league.ht_coverage)}</td>
       <td><span class="tag ${league.validated ? "ok" : "warn"}">${league.validated ? "validado" : "no"}</span></td>
     </tr>`;
   }).join("");
 
   const rejected = index.data_quality.rejected || {};
-  const rejectedRows = Object.entries(rejected).map(([key, value]) => `<tr><td>${key}</td><td>${value}</td></tr>`).join("");
+  const rejectedRows = Object.entries(rejected).map(([key, value]) => `<tr><td>${esc(key)}</td><td>${value}</td></tr>`).join("");
   $("quality").innerHTML = `
     <div class="meta-list">
       <div><span>Fuente principal</span><strong>openfootball</strong></div>
@@ -681,16 +794,19 @@ function renderData() {
 
   const advanced = index.data_quality.advanced_sample || { n: 0, rows: [] };
   $("advancedTag").textContent = `n=${advanced.n}`;
+  const correlationText = advanced.correlation_sot_goals === null || advanced.correlation_sot_goals === undefined
+    ? "sin datos"
+    : `${advanced.correlation_sot_goals} (IC95% ${fmtCI(advanced.correlation_ci, 3)}; p=${fmtP(advanced.correlation_p)})`;
   $("advancedSummary").innerHTML = `
     <div class="meta-list">
       <div><span>Partidos con estadísticas</span><strong>${advanced.n}</strong></div>
-      <div><span>Correlación (tiros a puerta − goles)</span><strong>${advanced.correlation_sot_goals ?? "—"}</strong></div>
+      <div><span>Correlación tiros a puerta − goles</span><strong>${correlationText}</strong></div>
       <div><span>xG disponible</span><strong>no</strong></div>
-      <div><span>Lectura</span><strong>muestra piloto</strong></div>
+      <div><span>Lectura</span><strong>${advanced.correlation_p !== null && advanced.correlation_p !== undefined && advanced.correlation_p < 0.05 ? "asociación exploratoria" : "sin evidencia"}</strong></div>
     </div>
-    <p class="note">${esc(advanced.note || "")}</p>`;
+    <p class="note">${esc(advanced.note || "")} n=24: describe, no infiere. La correlación es descriptiva y su intervalo es muy amplio.</p>`;
   $("advancedBody").innerHTML = advanced.rows.map((row) => `<tr>
-    <td>${row.date}</td><td>${esc(row.home)}</td><td>${esc(row.away)}</td>
+    <td>${esc(row.date)}</td><td>${esc(row.home)}</td><td>${esc(row.away)}</td>
     <td>${row.hg ?? "—"}–${row.ag ?? "—"}</td>
     <td>${row.shots_home ?? "—"}</td><td>${row.shots_away ?? "—"}</td>
     <td>${row.sot_home ?? "—"}</td><td>${row.sot_away ?? "—"}</td>
@@ -707,7 +823,7 @@ function drawReliability(container, bins, label) {
   const scaleX = (v) => pad + v * (w - pad - 12);
   const scaleY = (v) => h - pad - v * (h - pad - 12);
   const path = points.map((b, i) => `${i ? "L" : "M"}${scaleX(b.predicted).toFixed(1)},${scaleY(b.observed).toFixed(1)}`).join(" ");
-  const dots = points.map((b) => `<circle cx="${scaleX(b.predicted).toFixed(1)}" cy="${scaleY(b.observed).toFixed(1)}" r="${Math.min(3 + Math.sqrt(b.count) / 18, 8).toFixed(1)}"><title>${b.bin}: pred ${pct(b.predicted)} · obs ${pct(b.observed)} · n=${b.count}</title></circle>`).join("");
+  const dots = points.map((b) => `<circle cx="${scaleX(b.predicted).toFixed(1)}" cy="${scaleY(b.observed).toFixed(1)}" r="${Math.min(3 + Math.sqrt(b.count) / 18, 8).toFixed(1)}"><title>${esc(b.bin)}: pred ${pct(b.predicted)} · obs ${pct(b.observed)} · n=${b.count}</title></circle>`).join("");
   container.innerHTML = `<svg viewBox="0 0 ${w} ${h}" role="img" aria-label="Curva de fiabilidad ${label}">
     <line x1="${pad}" y1="${h - pad}" x2="${w - 12}" y2="${h - pad}" class="axis"/>
     <line x1="${pad}" y1="${pad}" x2="${pad}" y2="${h - pad}" class="axis"/>
@@ -723,30 +839,77 @@ function drawReliability(container, bins, label) {
 
 function renderModel() {
   const metrics = DATA.metrics;
-  const agg = metrics.aggregate_validated && metrics.aggregate_validated.n ? metrics.aggregate_validated : metrics.aggregate;
+  const agg = metrics.aggregate;
+  const inf = agg.inference || {};
   const delta = agg.brier !== null && agg.base_brier !== null ? agg.base_brier - agg.brier : null;
+
   $("metricCards").innerHTML = [
     ["Brier", agg.brier !== null ? agg.brier.toFixed(4) : "—", "menor es mejor"],
     ["Log-loss", agg.logloss !== null ? agg.logloss.toFixed(4) : "—", "menor es mejor"],
     ["Acierto 1X2", agg.accuracy !== null ? pct(agg.accuracy) : "—", "resultado más probable"],
-    ["Mejora vs baseline", delta !== null ? (delta > 0 ? "+" : "") + delta.toFixed(4) : "—", "Brier baseline − modelo"],
+    ["Brier Skill Score", inf.bss !== null && inf.bss !== undefined ? pct(inf.bss) : "—", "1 − Brier/Brier baseline"],
   ].map(([label, value, note]) => `<div class="card metric"><span class="k">${label}</span><strong>${value}</strong><span class="note">${note}</span></div>`).join("");
 
   $("mMatches").textContent = metrics.totals ? metrics.totals.matches.toLocaleString("es-ES") : "—";
   $("mLeagues").textContent = metrics.totals ? metrics.totals.leagues : DATA.leagues.length;
+
+  const bench = metrics.benchmark || {};
+  if (bench.available) {
+    const labels = { baseline: "Baseline (frecuencias)", dc: "Dixon-Coles", xgboost: "XGBoost", hybrid: "Híbrido 50/50" };
+    $("benchmarkBody").innerHTML = ["baseline", "dc", "xgboost", "hybrid"].map((key) => {
+      const model = bench.models[key] || {};
+      const modelInf = model.inference || {};
+      const gap = modelInf.delta_brier;
+      return `<tr>
+        <td>${labels[key]}</td><td>${model.n ?? "—"}</td>
+        <td>${model.brier !== null ? model.brier.toFixed(4) : "—"}</td>
+        <td>${fmtCI(modelInf.brier_ci, 4)}</td>
+        <td>${model.logloss !== null ? model.logloss.toFixed(4) : "—"}</td>
+        <td>${model.accuracy !== null ? pct(model.accuracy) : "—"}</td>
+        <td class="${gap > 0 ? "pos" : "neg"}">${gap !== null && gap !== undefined ? signed(gap, 4) : "—"}</td>
+        <td>${gap !== null && gap !== undefined ? fmtP(modelInf.p_value) : "—"}</td>
+      </tr>`;
+    }).join("");
+  } else {
+    $("benchmarkBody").innerHTML = `<tr><td colspan="8" class="muted">XGBoost no disponible; solo Dixon-Coles.</td></tr>`;
+  }
+
+  const decomposition = inf.brier_decomposition || {};
+  $("inferenceCards").innerHTML = [
+    ["Brier IC95%", fmtCI(inf.brier_ci, 4)],
+    ["BSS IC95%", inf.bss_ci ? fmtCI(inf.bss_ci.map((value) => value * 100), 1) + "%" : "—"],
+    ["ECE", inf.ece !== null && inf.ece !== undefined ? `${(inf.ece * 100).toFixed(2)}%` : "—"],
+    ["Fiabilidad", decomposition.reliability ?? "—"],
+    ["Resolución", decomposition.resolution ?? "—"],
+    ["Incertidumbre", decomposition.uncertainty ?? "—"],
+    ["Bloques bootstrap", inf.blocks ?? "—"],
+    ["p vs baseline", fmtP(inf.p_value)],
+  ].map(([label, value]) => `<div><span>${label}</span><strong>${value}</strong></div>`).join("");
+
+  const vsDc = bench.models ? bench.models.hybrid_vs_dc?.inference : null;
+  $("inferenceNote").textContent = (vsDc
+    ? `IC95% por bootstrap de bloques semanales. BSS = 1 − Brier/Brier baseline. Híbrido frente a Dixon-Coles: Δ Brier ${signed(vsDc.delta_brier, 4)} (${fmtCI(vsDc.delta_brier_ci, 4)}), p ${fmtP(vsDc.p_value)}. `
+    : "IC95% por bootstrap de bloques semanales. BSS = 1 − Brier/Brier baseline. ")
+    + "El agregado incluye todas las ligas evaluadas. El subconjunto validado se usa solo para decidir qué ligas publicar y está seleccionado por resultado: no es una estimación insesgada.";
+
   drawReliability($("relChartModel"), metrics.aggregate.reliability, "agregada");
 
   $("metricsBody").innerHTML = DATA.leagues.map((league) => {
     const m = metrics.leagues[league.code] || {};
     if (!m.n) return null;
-    const d = m.brier !== null && m.base_brier !== null ? m.base_brier - m.brier : null;
+    const gap = m.brier !== null && m.base_brier !== null ? m.base_brier - m.brier : null;
+    const ci = m.inference ? m.inference.brier_ci : null;
     return `<tr>
       <td>${esc(league.country)} · ${esc(league.name)}</td>
-      <td><span class="tag ${m.validated ? "ok" : "warn"}">${m.validated ? "validada" : "no"}</span></td>
-      <td>${m.n}</td><td>${m.brier !== null ? m.brier.toFixed(4) : "—"}</td>
-      <td>${m.base_brier !== null ? m.base_brier.toFixed(4) : "—"}</td>
-      <td class="${d !== null && d > 0 ? "pos" : "neg"}">${d !== null ? signed(d, 4) : "—"}</td>
-      <td>${m.logloss !== null ? m.logloss.toFixed(4) : "—"}</td>
+      <td>${esc(league.last)}</td>
+      <td><span class="tag ${m.validated ? "ok" : "warn"}">${m.validated ? "validada" : "sin evidencia"}</span></td>
+      <td>${m.n}</td>
+      <td>${m.brier !== null ? m.brier.toFixed(4) : "—"}</td>
+      <td>${m.dc_brier !== null && m.dc_brier !== undefined ? Number(m.dc_brier).toFixed(4) : "—"}</td>
+      <td>${fmtCI(ci, 4)}</td>
+      <td class="${gap !== null && gap > 0 ? "pos" : "neg"}">${gap !== null ? signed(gap, 4) : "—"}</td>
+      <td>${fmtP(m.p_value)}</td>
+      <td>${fmtP(m.q_value)}</td>
       <td>${m.accuracy !== null ? pct(m.accuracy) : "—"}</td>
       <td>${m.coverage !== null ? pct(m.coverage) : "—"}</td>
     </tr>`;
@@ -787,16 +950,22 @@ function setupPredict() {
 async function boot() {
   setupTabs();
   try {
-    const [leagues, ratings, metrics, labIndex] = await Promise.all([
+    const [leagues, ratings, metrics, labIndex, hybrid, live, sources] = await Promise.all([
       fetchJSON("data/leagues.json"),
       fetchJSON("data/ratings.json"),
       fetchJSON("data/metrics.json"),
       fetchJSON("data/lab/index.json"),
+      fetchJSON("data/hybrid.json").catch(() => null),
+      fetchJSON("data/live.json").catch(() => null),
+      fetchJSON("data/sources.json").catch(() => null),
     ]);
     DATA.leagues = leagues;
     DATA.ratings = ratings;
     DATA.metrics = metrics;
     DATA.labIndex = labIndex;
+    DATA.hybrid = hybrid;
+    DATA.live = live;
+    DATA.sources = sources;
     $("dataStamp").textContent = `datos hasta ${ratings.data_through}`;
 
     setupPredict();

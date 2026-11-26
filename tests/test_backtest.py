@@ -52,6 +52,7 @@ def test_alpha_blend_moves_towards_baseline():
         matches.append({"l": "en.1", "s": "2024-25", "d": f"2024-09-{1 + i % 28:02d}", "h": "B", "a": "A", "hg": 1, "ag": 1})
     model = ratings.fit(matches)
     base = {"home": 0.9, "draw": 0.05, "away": 0.05}
-    raw, _ = backtest._predict(model, [{"h": "A", "a": "B", "hg": 1, "ag": 0}], base, 0.0)
-    blended, _ = backtest._predict(model, [{"h": "A", "a": "B", "hg": 1, "ag": 0}], base, 0.5)
+    test = [{"h": "A", "a": "B", "hg": 1, "ag": 0, "d": "2024-10-01", "s": "2024-25"}]
+    raw, _, _ = backtest._predict(model, test, base, 0.0)
+    blended, _, _ = backtest._predict(model, test, base, 0.5)
     assert blended[0]["home"] > raw[0]["home"]

@@ -14,6 +14,29 @@ MATCHES = [
 ]
 
 
+def test_totals_separates_comebacks_from_leads_lost():
+    matches = [
+        {"l": "en.1", "s": "2024-25", "d": "2024-08-01", "h": "A", "a": "B", "hg": 2, "ag": 2, "ht": [2, 0]},
+        {"l": "en.1", "s": "2024-25", "d": "2024-08-02", "h": "C", "a": "D", "hg": 2, "ag": 1, "ht": [0, 1]},
+    ]
+    totals = stats.totals(matches)
+    assert totals["comebacks"] == 1
+    assert totals["leads_lost"] == 2
+
+
+def test_missing_halftime_in_goalless_match_is_imputed(tmp_path):
+    from sabermetria import ingest
+
+    raw = tmp_path / "raw"
+    (raw / "2024-25").mkdir(parents=True)
+    (raw / "2024-25" / "en.1.json").write_text(
+        '{"matches":[{"date":"2024-08-01","team1":"A","team2":"B","score":{"ft":[0,0]}}]}',
+        encoding="utf-8",
+    )
+    rows, _ = ingest.load_raw(raw)
+    assert rows[0]["ht"] == [0, 0]
+
+
 def test_totals_are_exact():
     totals = stats.totals(MATCHES)
     assert totals["matches"] == 6
@@ -25,7 +48,7 @@ def test_totals_are_exact():
     assert totals["avg_goals_1h"] == pytest.approx(7 / 6, abs=1e-3)
     assert totals["avg_goals_2h"] == pytest.approx(8 / 6, abs=1e-3)
     assert totals["comebacks"] == 1
-    assert totals["leads_lost"] == 1
+    assert totals["leads_lost"] == 2
 
 
 def test_team_stats_and_form():

@@ -28,7 +28,7 @@ from scipy.optimize import minimize
 
 DEFAULT_HALF_LIFE = 300.0
 DEFAULT_L2 = 0.02
-MAX_GOALS = 10
+MAX_GOALS = 15
 
 
 @dataclass
@@ -229,7 +229,7 @@ def lambdas(model: LeagueModel, home: str, away: str, neutral: bool = False) -> 
     venue = 0.0 if neutral else model.home_adv
     lam_h = exp(model.mu + venue + model.teams[home].attack - model.teams[away].defense)
     lam_a = exp(model.mu + model.teams[away].attack - model.teams[home].defense)
-    return float(np.clip(lam_h, 0.05, 8.0)), float(np.clip(lam_a, 0.05, 8.0))
+    return float(np.clip(lam_h, 0.05, 10.0)), float(np.clip(lam_a, 0.05, 10.0))
 
 
 def score_matrix(

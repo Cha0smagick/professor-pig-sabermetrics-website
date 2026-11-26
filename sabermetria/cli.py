@@ -5,9 +5,10 @@ from __future__ import annotations
 import argparse
 import json
 import sys
+from datetime import date
 from pathlib import Path
 
-from . import backtest, export, ingest, ratings
+from . import backtest, export, ingest, live, ratings
 
 
 def _utf8() -> None:
@@ -19,7 +20,7 @@ def _utf8() -> None:
 
 
 def cmd_ingest(args) -> int:
-    matches, rejected = ingest.load_raw(Path(args.raw), Path(args.aliases), Path(args.extra))
+    matches, rejected = ingest.load_raw(Path(args.raw), Path(args.aliases), Path(args.extra), Path(args.live))
     path = ingest.write_cache(matches, Path(args.cache))
     summary = ingest.summarize(matches)
     print(f"ligas={len(summary)} partidos={len(matches)} rechazados={dict(rejected)}")
@@ -32,7 +33,7 @@ def cmd_ingest(args) -> int:
 def cmd_build(args) -> int:
     print("Construyendo motor y artefactos web...")
     result = export.build(
-        Path(args.raw), Path(args.cache), Path(args.out), Path(args.aliases), Path(args.extra)
+        Path(args.raw), Path(args.cache), Path(args.out), Path(args.aliases), Path(args.extra), Path(args.live)
     )
     agg = result["aggregate"]
     print("")
@@ -44,7 +45,9 @@ def cmd_build(args) -> int:
 
 
 def cmd_backtest(args) -> int:
-    matches = ingest.ingest(Path(args.raw), Path(args.cache), Path(args.aliases), Path(args.extra))[0]
+    matches = ingest.ingest(
+        Path(args.raw), Path(args.cache), Path(args.aliases), Path(args.extra), Path(args.live)
+    )[0]
     groups: dict[str, list[dict]] = {}
     for match in matches:
         groups.setdefault(match["l"], []).append(match)
@@ -60,7 +63,9 @@ def cmd_backtest(args) -> int:
 
 
 def cmd_predict(args) -> int:
-    matches = ingest.ingest(Path(args.raw), Path(args.cache), Path(args.aliases), Path(args.extra))[0]
+    matches = ingest.ingest(
+        Path(args.raw), Path(args.cache), Path(args.aliases), Path(args.extra), Path(args.live)
+    )[0]
     rows = [m for m in matches if m["l"] == args.league]
     if not rows:
         print(f"Liga desconocida o sin datos: {args.league}")
@@ -74,6 +79,19 @@ def cmd_predict(args) -> int:
     return 0
 
 
+def cmd_update(args) -> int:
+    day = date.fromisoformat(args.date) if args.date else None
+    result = live.update(day, args.days)
+    print(json.dumps(result, indent=2, ensure_ascii=False))
+    if args.build:
+        built = export.build(
+            Path(args.raw), Path(args.cache), Path(args.out), Path(args.aliases), Path(args.extra), Path(args.live)
+        )
+        result["build"] = {"leagues": built["leagues"], "matches": built["matches"]}
+        print(json.dumps(result["build"], indent=2, ensure_ascii=False))
+    return 0
+
+
 def main(argv: list[str] | None = None) -> int:
     _utf8()
     parser = argparse.ArgumentParser(prog="sabermetria", description="Motor predictivo de futbol")
@@ -84,6 +102,7 @@ def main(argv: list[str] | None = None) -> int:
     common.add_argument("--cache", default=str(ingest.DEFAULT_CACHE))
     common.add_argument("--aliases", default=str(ingest.DEFAULT_ALIASES))
     common.add_argument("--extra", default=str(ingest.DEFAULT_EXTRA))
+    common.add_argument("--live", default=str(ingest.DEFAULT_LIVE))
 
     p_ingest = sub.add_parser("ingest", parents=[common], help="normaliza los JSON de openfootball")
     p_ingest.set_defaults(func=cmd_ingest)
@@ -101,6 +120,13 @@ def main(argv: list[str] | None = None) -> int:
     p_pred.add_argument("--away", required=True)
     p_pred.add_argument("--neutral", action="store_true")
     p_pred.set_defaults(func=cmd_predict)
+
+    p_update = sub.add_parser("update", parents=[common], help="descarga resultados del dia anterior")
+    p_update.add_argument("--days", type=int, default=1)
+    p_update.add_argument("--date", default=None)
+    p_update.add_argument("--build", action="store_true")
+    p_update.add_argument("--out", default=str(export.OUT_DIR))
+    p_update.set_defaults(func=cmd_update)
 
     args = parser.parse_args(argv)
     return args.func(args)
