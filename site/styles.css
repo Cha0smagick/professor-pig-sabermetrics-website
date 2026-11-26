@@ -413,6 +413,8 @@ button.link:hover { color: var(--primary); }
   .hero-sub { font-size: 15.5px; }
 }
 @media (max-width: 460px) {
+  nav.tabs { padding: 0 12px; }
+  nav.tabs button { padding: 13px 10px; font-size: 13px; }
   .hero-actions .btn { width: 100%; }
 }
 
