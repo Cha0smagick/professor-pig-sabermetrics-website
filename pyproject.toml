@@ -7,7 +7,7 @@ name = "professor-pigskin-sports-predictor"
 version = "1.0.0"
 description = "Professor Pigskin's Sports Predictor: motor predictivo y laboratorio estadistico de futbol"
 requires-python = ">=3.10"
-dependencies = ["numpy>=2.0,<3", "scipy>=1.11,<2", "pandas>=2.0,<3", "xgboost>=2.0,<4"]
+dependencies = ["numpy>=2.0,<3", "scipy>=1.11,<2", "xgboost>=2.0,<4"]
 
 [project.optional-dependencies]
 dev = ["pytest>=8.0"]

@@ -48,7 +48,7 @@ python -m venv .venv
 pip install -r requirements.txt
 ```
 
-Requiere Python 3.10+. Probado con 3.12, numpy 2.0, scipy 1.17, pandas 2.2.
+Requiere Python 3.10+. Probado con 3.12, numpy 2.0, scipy 1.17 y xgboost 3.x. Para tests: `pip install -r requirements-dev.txt`.
 
 ## Construir
 
