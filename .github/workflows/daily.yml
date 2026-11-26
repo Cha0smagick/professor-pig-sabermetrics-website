@@ -8,15 +8,20 @@ on:
 
 permissions:
   contents: write
+  pages: write
+  id-token: write
 
 concurrency:
   group: daily
   cancel-in-progress: false
 
 jobs:
-  fetch-results:
+  update-build-deploy:
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 60
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
 
@@ -36,8 +41,18 @@ jobs:
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add data/live_matches.jsonl data/live_events.jsonl
           if git diff --cached --quiet; then
-            echo "Sin resultados nuevos; no se commitea."
+            echo "Sin resultados nuevos."
           else
-            git commit -m "data: resultados diarios $(date -u +%F)"
+            git commit -m "data: resultados diarios $(date -u +%F) [skip ci]"
             git push
           fi
+
+      - name: Reconstruir modelo y web
+        run: python -m sabermetria build
+
+      - uses: actions/upload-pages-artifact@56afc609e74202658d3ffba0e8f6dda462b719fa # v3
+        with:
+          path: site
+
+      - id: deployment
+        uses: actions/deploy-pages@d6db90164ac5ed86f2b6aed7e0febac5b3c0c03e # v4

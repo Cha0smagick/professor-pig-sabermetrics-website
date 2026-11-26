@@ -85,8 +85,8 @@ Abre `http://localhost:8000`. No abras `index.html` con `file://`: el navegador 
 
 El repositorio incluye dos workflows:
 
-- `daily.yml`: descarga resultados a las 06:00 de Bogotá y commitea solo `data/live_matches.jsonl` y `data/live_events.jsonl`.
-- `pages.yml`: en cada push (incluido el commit diario) instala dependencias, reconstruye la web y publica `site/` en Pages.
+- `daily.yml`: a las 06:00 de Bogotá descarga resultados, commitea solo `data/live_matches.jsonl` y `data/live_events.jsonl`, reconstruye el modelo y despliega en Pages.
+- `pages.yml`: en cada push publica el snapshot versionado de `site/` (sin rebuild pesado).
 
 ```powershell
 git add .
