@@ -93,3 +93,21 @@
 {"sport":"hockey hielo","league":"NHL","date":"2026-11-25","home":"MTL","away":"COL","hg":0,"ag":6,"source":"nhl-api"}
 {"sport":"hockey hielo","league":"NHL","date":"2026-11-25","home":"CHI","away":"SEA","hg":3,"ag":1,"source":"nhl-api"}
 {"sport":"hockey hielo","league":"NHL","date":"2026-11-25","home":"SJS","away":"ANA","hg":0,"ag":7,"source":"nhl-api"}
+{"sport":"baloncesto","league":"FIBA Basketball World Cup","date":"2026-11-26","home":"Saudi Arabia Basketball","away":"China Basketball","hg":82,"ag":80,"source":"thesportsdb"}
+{"sport":"baloncesto","league":"FIBA Basketball World Cup","date":"2026-11-26","home":"Qatar Basketball","away":"South Korea Basketball","hg":52,"ag":74,"source":"thesportsdb"}
+{"sport":"baloncesto","league":"FIBA Basketball World Cup","date":"2026-11-26","home":"Lebanon Basketball","away":"Japan Basketball","hg":82,"ag":86,"source":"thesportsdb"}
+{"sport":"béisbol","league":"Mexican Pacific League","date":"2026-11-26","home":"Venados de Mazatlán","away":"Yaquis de Obregón","hg":9,"ag":8,"source":"thesportsdb"}
+{"sport":"béisbol","league":"Mexican Pacific League","date":"2026-11-26","home":"Mayos de Navojoa","away":"Tomateros de Culiacán","hg":7,"ag":2,"source":"thesportsdb"}
+{"sport":"béisbol","league":"Mexican Pacific League","date":"2026-11-26","home":"Cañeros de Los Mochis","away":"Algodoneros de Guasave","hg":1,"ag":3,"source":"thesportsdb"}
+{"sport":"fútbol","league":"Brazilian Serie A","date":"2026-11-26","home":"São Paulo","away":"Remo","hg":3,"ag":1,"source":"thesportsdb"}
+{"sport":"fútbol","league":"Georgian Erovnuli Liga 2","date":"2026-11-26","home":"Aragvi Dusheti","away":"Merani Martvili","hg":1,"ag":3,"source":"thesportsdb"}
+{"sport":"fútbol","league":"Georgian Erovnuli Liga 2","date":"2026-11-26","home":"Gareji","away":"Samtredia","hg":1,"ag":1,"source":"thesportsdb"}
+{"sport":"fútbol americano","league":"NFL","date":"2026-11-26","home":"Los Angeles Rams","away":"Green Bay Packers","hg":26,"ag":13,"source":"thesportsdb"}
+{"sport":"fútbol americano","league":"NFL","date":"2026-11-26","home":"Detroit Lions","away":"Chicago Bears","hg":35,"ag":39,"source":"thesportsdb"}
+{"sport":"fútbol americano","league":"NFL","date":"2026-11-26","home":"Dallas Cowboys","away":"Philadelphia Eagles","hg":38,"ag":39,"source":"thesportsdb"}
+{"sport":"fútbol americano","league":"NFL","date":"2026-11-26","home":"CHI","away":"DET","hg":39,"ag":35,"source":"nflverse"}
+{"sport":"fútbol americano","league":"NFL","date":"2026-11-26","home":"PHI","away":"DAL","hg":39,"ag":38,"source":"nflverse"}
+{"sport":"fútbol americano","league":"NFL","date":"2026-11-26","home":"KC","away":"BUF","hg":10,"ag":13,"source":"nflverse"}
+{"sport":"hockey hielo","league":"Swedish Hockey League","date":"2026-11-26","home":"Växjö Lakers","away":"Djurgårdens IF","hg":4,"ag":1,"source":"thesportsdb"}
+{"sport":"hockey hielo","league":"Swedish Hockey League","date":"2026-11-26","home":"Timrå IK","away":"Färjestad BK","hg":4,"ag":5,"source":"thesportsdb"}
+{"sport":"hockey hielo","league":"Swedish Hockey League","date":"2026-11-26","home":"Skellefteå AIK","away":"Rögle BK","hg":1,"ag":4,"source":"thesportsdb"}
